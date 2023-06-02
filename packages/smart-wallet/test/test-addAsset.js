@@ -66,7 +66,6 @@ test.serial('avoid O(wallets) storage writes for a new asset', async t => {
     /** @type {bigint | undefined} */
     let publishCount;
     for (;;) {
-      // eslint-disable-next-line no-await-in-loop
       const news = await E(current).subscribeAfter(publishCount);
       publishCount = news.publishCount;
       chainStorageWrites += 1;

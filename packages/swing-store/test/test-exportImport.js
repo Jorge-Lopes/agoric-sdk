@@ -122,7 +122,6 @@ test('crank abort leaves no debris in export log', async t => {
         crankNum % 3 === 0,
       );
     }
-    // eslint-disable-next-line no-await-in-loop
     await ssOut.hostStorage.commit();
   }
 
@@ -218,10 +217,8 @@ async function testExportImport(
       actLikeAVatRunningACrank(vat, kernelStorage, crankNum);
     }
     if (block < 3) {
-      // eslint-disable-next-line no-await-in-loop
       await fakeAVatSnapshot(vats[block % 2], kernelStorage);
     }
-    // eslint-disable-next-line no-await-in-loop
     await ssOut.hostStorage.commit();
   }
 

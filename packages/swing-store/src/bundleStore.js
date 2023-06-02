@@ -328,7 +328,6 @@ export function makeBundleStore(db, ensureTxn, noteExport = () => {}) {
         endoZipBase64: encodeBase64(data),
       });
       // Assert that the bundle contents match the ID and hash
-      // eslint-disable-next-line @jessie.js/no-nested-await
       await checkBundle(bundle, computeSha512, bundleID);
       populateBundle(bundleID, serializeBundle(bundleID, bundle));
     } else {
