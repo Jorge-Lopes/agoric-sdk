@@ -333,6 +333,7 @@ export function makeSnapStore(
     snapReader.pipe(hashStream);
     snapReader.pipe(output);
 
+    await null;
     try {
       yield* output;
     } finally {

@@ -239,6 +239,7 @@ export const makeCosmjsFollower = (
    * @returns {Promise<QueryStoreResponse>}
    */
   const tryGetDataAtHeight = async blockHeight => {
+    await null;
     if (proof === 'strict') {
       // Crash hard if we can't prove.
       return getProvenDataAtHeight(blockHeight).catch(crash);
@@ -273,6 +274,7 @@ export const makeCosmjsFollower = (
    * @param {number} [blockHeight] desired height, or the latest height if not set
    */
   const getDataAtHeight = async blockHeight => {
+    await null;
     for (let attempt = 0; ; attempt += 1) {
       try {
         // AWAIT
@@ -395,6 +397,7 @@ export const makeCosmjsFollower = (
     /** @type {number | undefined} the last known latest height */
     let lastHeight;
     let lastValue;
+    await null;
     for (;;) {
       const latest = await getDataAtHeight();
       if (lastHeight && latest.height <= lastHeight) {
@@ -445,6 +448,7 @@ export const makeCosmjsFollower = (
     // block.
     // If the block has no corresponding data, wait for the first block to
     // contain data.
+    await null;
     for (;;) {
       let thisHeight;
       ({ value: cursorData, height: thisHeight } = await getDataAtHeight(
@@ -559,6 +563,7 @@ export const makeCosmjsFollower = (
     // cursorBlockHeight) so we know not to emit duplicates
     // of that cell.
     let cursorData;
+    await null;
     while (cursorBlockHeight === undefined || cursorBlockHeight > 0) {
       ({ value: cursorData, height: cursorBlockHeight } = await getDataAtHeight(
         cursorBlockHeight,
