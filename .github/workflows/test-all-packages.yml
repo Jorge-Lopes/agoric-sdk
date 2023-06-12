@@ -229,8 +229,6 @@ jobs:
       - name: yarn test (deploy-script-support)
         if: (success() || failure())
         run: cd packages/deploy-script-support && yarn ${{ steps.vars.outputs.test }} | $TEST_COLLECT
-      - name: yarn test (ui-components)
-        run: cd packages/ui-components && yarn ${{ steps.vars.outputs.test }} | $TEST_COLLECT
       - name: yarn test (wallet)
         if: (success() || failure())
         run: cd packages/wallet && yarn ${{ steps.vars.outputs.test }} | $TEST_COLLECT
