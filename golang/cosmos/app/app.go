@@ -1,6 +1,7 @@
 package gaia
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -284,7 +285,7 @@ func NewGaiaApp(
 	appOpts servertypes.AppOptions,
 	baseAppOptions ...func(*baseapp.BaseApp),
 ) *GaiaApp {
-	defaultController := func(needReply bool, str string) (string, error) {
+	defaultController := func(ctx context.Context, needReply bool, str string) (string, error) {
 		fmt.Fprintln(os.Stderr, "FIXME: Would upcall to controller with", str)
 		return "", nil
 	}
@@ -296,7 +297,7 @@ func NewGaiaApp(
 }
 
 func NewAgoricApp(
-	sendToController func(bool, string) (string, error),
+	sendToController func(context.Context, bool, string) (string, error),
 	logger log.Logger, db dbm.DB, traceStore io.Writer, loadLatest bool, skipUpgradeHeights map[int64]bool,
 	homePath string, invCheckPeriod uint, encodingConfig gaiaappparams.EncodingConfig, appOpts servertypes.AppOptions, baseAppOptions ...func(*baseapp.BaseApp),
 ) *GaiaApp {
@@ -440,7 +441,7 @@ func NewAgoricApp(
 		app.CheckControllerInited(true)
 		// We use SwingSet-level metering to charge the user for the call.
 		defer vm.SetControllerContext(ctx)()
-		return sendToController(true, str)
+		return sendToController(sdk.WrapSDKContext(ctx), true, str)
 	}
 
 	setBootstrapNeeded := func() {
@@ -472,7 +473,7 @@ func NewAgoricApp(
 			if err != nil {
 				return "", err
 			}
-			return sendToController(true, string(bz))
+			return sendToController(context.Background(), true, string(bz))
 		},
 	)
 
