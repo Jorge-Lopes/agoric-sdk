@@ -43,6 +43,7 @@
     "overrides": [
       {
         "files": [
+          "packages/ERTP/**/*.{js,ts}",
           "packages/inter-protocol/**/*.{js,ts}",
           "packages/vats/**/*.{js,ts}"
         ],
