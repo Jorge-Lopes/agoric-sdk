@@ -55,7 +55,7 @@ var (
 	DefaultBeansPerStorageByte          = DefaultBeansPerFeeUnit.Quo(sdk.NewUint(500))    // $0.002
 	DefaultBeansPerSmartWalletProvision = DefaultBeansPerFeeUnit                          // $1
 
-	DefaultBootstrapVatConfig = "@agoric/boot/decentral-core-config.json"
+	DefaultBootstrapVatConfig = "@agoric/vm-config/decentral-core-config.json"
 
 	DefaultPowerFlagFees = []PowerFlagFee{
 		NewPowerFlagFee(PowerFlagSmartWallet, sdk.NewCoins(sdk.NewInt64Coin("ubld", 10_000_000))),
