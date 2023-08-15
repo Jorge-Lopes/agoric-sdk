@@ -1,6 +1,7 @@
 /* backported code conforms to newer coding standards */
 /* eslint-disable no-await-in-loop */
 // @ts-check
+/* eslint @typescript-eslint/no-floating-promises: "warn" */
 import { test as anyTest } from '@agoric/zoe/tools/prepare-test-env-ava.js';
 import { E, Far } from '@endo/far';
 import { buildRootObject as buildBankVatRoot } from '@agoric/vats/src/vat-bank.js';
