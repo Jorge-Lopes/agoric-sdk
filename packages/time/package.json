@@ -39,6 +39,11 @@
     "@endo/init": "0.5.56",
     "ava": "^5.2.0"
   },
+  "ava": {
+    "require": [
+      "@endo/init/debug.js"
+    ]
+  },
   "files": [
     "*.js",
     "NEWS.md",

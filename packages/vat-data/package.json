@@ -28,6 +28,11 @@
     "ava": "^5.2.0",
     "tsd": "^0.28.1"
   },
+  "ava": {
+    "require": [
+      "@endo/init/debug.js"
+    ]
+  },
   "publishConfig": {
     "access": "public"
   },
