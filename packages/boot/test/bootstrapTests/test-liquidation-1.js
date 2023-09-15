@@ -10,7 +10,7 @@ import {
   likePayouts,
   makeLiquidationTestContext,
   scale6,
-} from './liquidation.js';
+} from './liquidation.ts';
 
 /**
  * @type {import('ava').TestFn<Awaited<ReturnType<typeof makeLiquidationTestContext>>>}
