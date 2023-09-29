@@ -38,5 +38,8 @@
   },
   "engines": {
     "node": ">=14.15.0"
+  },
+  "typeCoverage": {
+    "atLeast": 0
   }
 }
