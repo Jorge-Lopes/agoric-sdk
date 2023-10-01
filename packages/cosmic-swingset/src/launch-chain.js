@@ -84,7 +84,14 @@ export async function buildSwingset(
   vatconfig,
   bootstrapArgs,
   env,
-  { debugName = undefined, slogCallbacks, slogSender, verbose },
+  {
+    debugName = undefined,
+    slogCallbacks,
+    slogSender,
+    verbose,
+    profileVats,
+    debugVats,
+  },
 ) {
   const debugPrefix = debugName === undefined ? '' : `${debugName}:`;
   const mbs = buildMailboxStateMap(mailboxStorage);
@@ -182,6 +189,8 @@ export async function buildSwingset(
       slogCallbacks,
       slogSender,
       verbose,
+      profileVats,
+      debugVats,
     },
   );
 
