@@ -1,4 +1,3 @@
-// @ts-check
 /**
  * Should be a union with Remotable, but that's `any`, making this type meaningless
  *
