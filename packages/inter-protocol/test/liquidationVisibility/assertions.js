@@ -7,7 +7,7 @@ import {
   ceilMultiplyBy,
   makeRatio,
 } from '@agoric/zoe/src/contractSupport/index.js';
-import { subscribeEach } from '@agoric/notifier';
+import { headValue } from '../supports.js';
 
 export const assertBidderPayout = async (
   t,
@@ -154,4 +154,33 @@ export const assertAuctioneerSchedule = async (
   ).getUpdateSince();
 
   t.deepEqual(auctioneerSchedule.value, expectedSchedule);
+};
+
+export const assertAuctioneerPathData = async (
+  t,
+  hasTopics,
+  brand,
+  topicName,
+  path,
+  dataKeys,
+) => {
+  let topic;
+  if (brand) {
+    topic = await E(hasTopics)
+      .getPublicTopics(brand)
+      .then(topics => topics[topicName]);
+  } else {
+    topic = await E(hasTopics)
+      .getPublicTopics()
+      .then(topics => topics[topicName]);
+  }
+
+  t.is(await topic?.storagePath, path, 'topic storagePath must match');
+  const latest = /** @type {Record<string, unknown>} */ (
+    await headValue(topic.subscriber)
+  );
+  if (dataKeys !== undefined) {
+    // TODO consider making this a shape instead
+    t.deepEqual(Object.keys(latest), dataKeys, 'keys in topic feed must match');
+  }
 };

@@ -12,6 +12,8 @@ import { startVaultFactory } from '../../src/proposals/econ-behaviors.js';
 import { makeRatioFromAmounts } from '@agoric/zoe/src/contractSupport/index.js';
 import { eventLoopIteration } from '@agoric/internal/src/testing-utils.js';
 import { TimeMath } from '@agoric/time';
+import { subscriptionTracker } from '../metrics.js';
+import { subscribeEach } from '@agoric/notifier';
 import '../../src/vaultFactory/types.js';
 
 const contractRoots = {
@@ -62,11 +64,10 @@ export const setupBasics = async zoe => {
 
 /**
  * NOTE: called separately by each test so zoe/priceAuthority don't interfere
- * This helper function will economicCommittee, reserve and auctioneer. 
- * It will start the vaultFactory and open a new vault with the collateral
- * provided in the context.
- * The collateral value will be set by the priceAuthority with the ratio provided
- * by priceOrList
+ * This helper function will economicCommittee, reserve and auctioneer. It will
+ * start the vaultFactory and open a new vault with the collateral provided in
+ * the context. The collateral value will be set by the priceAuthority with the
+ * ratio provided by priceOrList
  *
  * @param {import('ava').ExecutionContext<Context>} t
  * @param {NatValue[] | Ratio} priceOrList
@@ -95,16 +96,17 @@ export const setupServices = async (
 
   t.context.timer = timer;
 
-  const { space, priceAuthorityAdmin, aethTestPriceAuthority } = await setupElectorateReserveAndAuction(
-    t,
-    // @ts-expect-error inconsistent types with withAmountUtils
-    run,
-    aeth,
-    priceOrList,
-    quoteInterval,
-    unitAmountIn,
-    auctionParams,
-  );
+  const { space, priceAuthorityAdmin, aethTestPriceAuthority } =
+    await setupElectorateReserveAndAuction(
+      t,
+      // @ts-expect-error inconsistent types with withAmountUtils
+      run,
+      aeth,
+      priceOrList,
+      quoteInterval,
+      unitAmountIn,
+      auctionParams,
+    );
 
   const {
     consume,
@@ -241,3 +243,23 @@ export const bid = async (t, zoe, auctioneerKit, aeth, bidAmount, desired) => {
   );
   return bidderSeat;
 };
+
+export const getBookDataTracker = async (t, auctioneerPublicFacet, brand) => {
+  const tracker = E.when(
+    E(auctioneerPublicFacet).getBookDataUpdates(brand),
+    subscription => subscriptionTracker(t, subscribeEach(subscription)),
+  );
+
+  return tracker;
+};
+
+export const getSchedulerTracker = async (t, auctioneerPublicFacet) => {
+  const tracker = E.when(
+    E(auctioneerPublicFacet).getPublicTopics(),
+    subscription =>
+      subscriptionTracker(t, subscribeEach(subscription.schedule.subscriber)),
+  );
+
+  return tracker;
+};
+
