@@ -2,14 +2,10 @@
 
 import { test } from '@agoric/zoe/tools/prepare-test-env-ava.js';
 import { E } from '@endo/eventual-send';
-
 import { setUpZoeForTest } from '@agoric/zoe/tools/setup-zoe.js';
 import { deeplyFulfilled } from '@endo/marshal';
-
 import { makeTracer } from '@agoric/internal';
-
 import { buildManualTimer } from '@agoric/swingset-vat/tools/manual-timer.js';
-
 import {
   makeRatio,
   makeRatioFromAmounts,
@@ -19,17 +15,15 @@ import {
   legacyOfferResult,
 } from '../vaultFactory/vaultFactoryUtils.js';
 import { SECONDS_PER_HOUR as ONE_HOUR } from '../../src/proposals/econ-behaviors.js';
-
 import { documentStorageSchema } from '@agoric/governance/tools/storageDoc.js';
 import { reserveInitialState } from '../metrics.js';
-
-import { eventLoopIteration } from '@agoric/internal/src/testing-utils.js';
 import {
   bid,
   setClockAndAdvanceNTimes,
   setupBasics,
   setupServices,
   startAuctionClock,
+  getDataFromVstorage,
 } from './tools.js';
 import {
   assertBidderPayout,
@@ -46,6 +40,7 @@ import {
   assertBookData,
   assertAuctioneerSchedule,
   assertAuctioneerPathData,
+  assertVaultData,
 } from './assertions.js';
 
 const trace = makeTracer('TestLiquidationVisibility', false);
@@ -88,13 +83,6 @@ test.before(async t => {
 test('test vault liquidation', async t => {
   const { zoe, run, aeth } = t.context;
   const manualTimer = buildManualTimer();
-
-  // describe the purpose of interestTiming
-
-  t.context.interestTiming = {
-    chargingPeriod: 2n,
-    recordingPeriod: 10n,
-  };
 
   const services = await setupServices(
     t,
@@ -196,11 +184,6 @@ test('test liquidate vault with snapshot', async t => {
   const { zoe, run, aeth } = t.context;
   const manualTimer = buildManualTimer();
 
-  t.context.interestTiming = {
-    chargingPeriod: 2n,
-    recordingPeriod: 10n,
-  };
-
   const services = await setupServices(
     t,
     makeRatio(50n, run.brand, 10n, aeth.brand),
@@ -262,17 +245,67 @@ test('test liquidate vault with snapshot', async t => {
 });
 
 /* 
-The objective of this test is to be able to query the:
+Verify the following data when extracted from vstorage:
 - Vault Manager
 - Collateral at time of liquidation
 - Debt at time of liquidation
 - Time of liquidation
 */
+test('test visibility of vault liquidation', async t => {
+  const { zoe, run, aeth } = t.context;
+  const manualTimer = buildManualTimer();
 
-test('test visibility of vault liquidation', async t => {});
+  const services = await setupServices(
+    t,
+    makeRatio(50n, run.brand, 10n, aeth.brand),
+    aeth.make(400n),
+    manualTimer,
+    undefined,
+    { StartFrequency: ONE_HOUR },
+  );
+
+  const {
+    vaultFactory: { aethCollateralManager },
+    reserveKit: { reserveCreatorFacet, reservePublicFacet },
+    auctioneerKit,
+  } = services;
+
+  await E.get(E(reservePublicFacet).getPublicTopics()).metrics;
+  await E(reserveCreatorFacet).addIssuer(aeth.issuer, 'Aeth');
+
+  const collateralAmount = aeth.make(400n);
+  const wantMinted = run.make(1600n);
+
+  const vaultSeat = await E(zoe).offer(
+    await E(aethCollateralManager).makeVaultInvitation(),
+    harden({
+      give: { Collateral: collateralAmount },
+      want: { Minted: wantMinted },
+    }),
+    harden({
+      Collateral: aeth.mint.mintPayment(collateralAmount),
+    }),
+  );
+
+  // A bidder places a bid
+  const bidAmount = run.make(2000n);
+  const desired = aeth.make(400n);
+  await bid(t, zoe, auctioneerKit, aeth, bidAmount, desired);
+
+  // test is the vault data retrieved from publisher match the storage
+  const {
+    publicNotifiers: { vault: vaultNotifier },
+  } = await legacyOfferResult(vaultSeat);
+
+  const storage = await services.space.consume.chainStorage;
+  const node = 'vaultFactory.managers.manager0.vaults.vault0';
+  const vaultDataVstorage = await getDataFromVstorage(storage, node);
+
+  await assertVaultData(t, vaultNotifier, vaultDataVstorage);
+});
 
 /* 
-The objective of this test is to be able to query the:
+Verify the following data when extracted from vstorage:
 - Auction identifier	
 - Auction start	
 - Collateral offered	
@@ -418,7 +451,7 @@ test('test visibility of auction', async t => {
 });
 
 /* 
-The objective of this test is to be able to query the:
+Verify the following data when extracted from vstorage:
 - Collateral sent to reserve
 - Collateral returned to vault
 - Debt returned to vault
