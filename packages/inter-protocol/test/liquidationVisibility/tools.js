@@ -263,3 +263,18 @@ export const getSchedulerTracker = async (t, auctioneerPublicFacet) => {
   return tracker;
 };
 
+export const getDataFromVstorage = async (storage, node) => {
+  const illustration = [...storage.keys()].sort().map(
+    /** @type {(k: string) => [string, unknown]} */
+    key => [
+      key.replace('mockChainStorageRoot.', 'published.'),
+      storage.getBody(key),
+    ],
+  );
+
+  const pruned = illustration.filter(
+    node ? ([key, _]) => key.startsWith(`published.${node}`) : _entry => true,
+  );
+
+  return pruned;
+};
