@@ -184,3 +184,12 @@ export const assertAuctioneerPathData = async (
     t.deepEqual(Object.keys(latest), dataKeys, 'keys in topic feed must match');
   }
 };
+
+export const assertVaultData = async (
+  t,
+  vaultDataSubscriber,
+  vaultDataVstorage,
+) => {
+  const auctioneerBookData = await E(vaultDataSubscriber).getUpdateSince();
+  t.deepEqual(auctioneerBookData.value, vaultDataVstorage[0][1]);
+};
