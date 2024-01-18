@@ -1,13 +1,13 @@
 import '@agoric/zoe/exported.js';
 import { E } from '@endo/eventual-send';
 import { assertPayoutAmount } from '@agoric/zoe/test/zoeTestHelpers.js';
-import { subscriptionTracker } from '../metrics.js';
 import { AmountMath } from '@agoric/ertp';
 import {
   ceilMultiplyBy,
   makeRatio,
 } from '@agoric/zoe/src/contractSupport/index.js';
 import { headValue } from '../supports.js';
+import { subscriptionTracker } from '../metrics.js';
 
 export const assertBidderPayout = async (
   t,
@@ -45,6 +45,9 @@ export const assertReserveState = async (t, metricsTopic, method, expected) => {
       break;
     case 'state':
       await m.assertState(expected);
+      break;
+    default:
+      console.log('Default')
       break;
   }
 };
