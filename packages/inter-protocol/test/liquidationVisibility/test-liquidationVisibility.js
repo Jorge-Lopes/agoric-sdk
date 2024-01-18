@@ -10,12 +10,12 @@ import {
   makeRatio,
   makeRatioFromAmounts,
 } from '@agoric/zoe/src/contractSupport/index.js';
+import { documentStorageSchema } from '@agoric/governance/tools/storageDoc.js';
 import {
   defaultParamValues,
   legacyOfferResult,
 } from '../vaultFactory/vaultFactoryUtils.js';
 import { SECONDS_PER_HOUR as ONE_HOUR } from '../../src/proposals/econ-behaviors.js';
-import { documentStorageSchema } from '@agoric/governance/tools/storageDoc.js';
 import { reserveInitialState } from '../metrics.js';
 import {
   bid,
@@ -458,4 +458,6 @@ Verify the following data when extracted from vstorage:
 - Shortfall sent to reserve
 */
 
-test('test visibility of post auction distribution', async t => {});
+test('test visibility of post auction distribution', async t => {
+  t.pass();
+});

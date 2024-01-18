@@ -1,20 +1,20 @@
 import { E } from '@endo/eventual-send';
-import { withAmountUtils } from '../supports.js';
 import { makeIssuerKit } from '@agoric/ertp';
 import { unsafeMakeBundleCache } from '@agoric/swingset-vat/tools/bundleTool.js';
 import { allValues, objectMap } from '@agoric/internal';
+import { buildManualTimer } from '@agoric/swingset-vat/tools/manual-timer.js';
+import { makeRatioFromAmounts } from '@agoric/zoe/src/contractSupport/index.js';
+import { eventLoopIteration } from '@agoric/internal/src/testing-utils.js';
+import { TimeMath } from '@agoric/time';
+import { subscribeEach } from '@agoric/notifier';
+import '../../src/vaultFactory/types.js';
+import { withAmountUtils } from '../supports.js';
 import {
   getRunFromFaucet,
   setupElectorateReserveAndAuction,
 } from '../vaultFactory/vaultFactoryUtils.js';
-import { buildManualTimer } from '@agoric/swingset-vat/tools/manual-timer.js';
-import { startVaultFactory } from '../../src/proposals/econ-behaviors.js';
-import { makeRatioFromAmounts } from '@agoric/zoe/src/contractSupport/index.js';
-import { eventLoopIteration } from '@agoric/internal/src/testing-utils.js';
-import { TimeMath } from '@agoric/time';
 import { subscriptionTracker } from '../metrics.js';
-import { subscribeEach } from '@agoric/notifier';
-import '../../src/vaultFactory/types.js';
+import { startVaultFactory } from '../../src/proposals/econ-behaviors.js';
 
 const contractRoots = {
   faucet: './test/vaultFactory/faucet.js',
@@ -157,7 +157,6 @@ export const setupServices = async (
     vfPublic,
     aethVaultManager,
     auctioneerKit,
-    priceAuthority,
     aethCollateralManager,
   ] = await Promise.all([
     E(consume.agoricNames).lookup('instance', 'VaultFactoryGovernor'),
@@ -165,7 +164,6 @@ export const setupServices = async (
     E.get(consume.vaultFactoryKit).publicFacet,
     aethVaultManagerP,
     consume.auctioneerKit,
-    /** @type {Promise<ManualPriceAuthority>} */ (consume.priceAuthority),
     E(aethVaultManagerP).getPublicFacet(),
   ]);
 
