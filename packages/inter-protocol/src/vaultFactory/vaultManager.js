@@ -64,6 +64,7 @@ import { calculateMinimumCollateralization, minimumPrice } from './math.js';
 import { makePrioritizedVaults } from './prioritizedVaults.js';
 import { Phase, prepareVault } from './vault.js';
 import { calculateDistributionPlan } from './proceeds.js';
+import { TimestampShape } from '@agoric/time';
 
 const { details: X, Fail, quote: q } = assert;
 
@@ -171,6 +172,7 @@ export const watchQuoteNotifier = async (notifierP, watcher, ...args) => {
  * @typedef {{
  *   assetTopicKit: import('@agoric/zoe/src/contractSupport/recorder.js').RecorderKit<AssetState>;
  *   debtBrand: Brand<'nat'>;
+ *   liquidationsStorageNode: StorageNode;
  *   liquidatingVaults: SetStore<Vault>;
  *   metricsTopicKit: import('@agoric/zoe/src/contractSupport/recorder.js').RecorderKit<MetricsNotification>;
  *   poolIncrementSeat: ZCFSeat;
@@ -227,7 +229,9 @@ export const prepareVaultManagerKit = (
   const makeVault = prepareVault(baggage, makeRecorderKit, zcf);
 
   /**
-   * @param {HeldParams & { metricsStorageNode: StorageNode }} params
+   * @param {HeldParams & { metricsStorageNode: StorageNode } & {
+   *   liquidationsStorageNode: StorageNode;
+   * }} params
    * @returns {HeldParams & ImmutableState & MutableState}
    */
   const initState = params => {
@@ -235,6 +239,7 @@ export const prepareVaultManagerKit = (
       debtMint,
       collateralBrand,
       metricsStorageNode,
+      liquidationsStorageNode,
       startTimeStamp,
       storageNode,
     } = params;
@@ -244,7 +249,7 @@ export const prepareVaultManagerKit = (
     const immutable = {
       debtBrand,
       poolIncrementSeat: zcf.makeEmptySeatKit().zcfSeat,
-
+      liquidationsStorageNode,
       /**
        * Vaults that have been sent for liquidation. When we get proceeds (or
        * lack thereof) back from the liquidator, we will allocate them among the
@@ -336,7 +341,9 @@ export const prepareVaultManagerKit = (
         getCollateralQuote: M.call().returns(PriceQuoteShape),
         getPublicFacet: M.call().returns(M.remotable('publicFacet')),
         lockOraclePrices: M.call().returns(PriceQuoteShape),
-        liquidateVaults: M.call(AuctionPFShape).returns(M.promise()),
+        liquidateVaults: M.call(AuctionPFShape, TimestampShape).returns(
+          M.promise(),
+        ),
       }),
     },
     initState,
@@ -815,6 +822,45 @@ export const prepareVaultManagerKit = (
           // liqSeat should be empty at this point, except that funds are sent
           // asynchronously to the reserve.
         },
+
+        /** @param {{ absValue: BigInt }} timestamp */
+        async liquidationRecorderKits(timestamp) {
+          const {
+            state: { liquidationsStorageNode },
+          } = this;
+
+          const timestampStorageNode = await E(
+            liquidationsStorageNode,
+          ).makeChildNode(`liquidation${timestamp.absValue}`);
+
+          const [
+            preAuctionStorageNode,
+            postAuctionStorageNode,
+            auctionResultStorageNode,
+          ] = await Promise.all([
+            E(E(timestampStorageNode).makeChildNode('vaults')).makeChildNode(
+              'preAuction',
+            ),
+            E(E(timestampStorageNode).makeChildNode('vaults')).makeChildNode(
+              'postAuction',
+            ),
+            E(timestampStorageNode).makeChildNode('auctionResult'),
+          ]);
+
+          const preAuctionRecorderKit = makeRecorderKit(preAuctionStorageNode);
+          const postAuctionRecorderKit = makeRecorderKit(
+            postAuctionStorageNode,
+          );
+          const auctionResultRecorderKit = makeRecorderKit(
+            auctionResultStorageNode,
+          );
+
+          return {
+            preAuctionRecorderKit,
+            postAuctionRecorderKit,
+            auctionResultRecorderKit,
+          };
+        },
       },
 
       manager: {
@@ -1115,8 +1161,11 @@ export const prepareVaultManagerKit = (
           void facets.helper.writeMetrics();
           return storedCollateralQuote;
         },
-        /** @param {ERef<AuctioneerPublicFacet>} auctionPF */
-        async liquidateVaults(auctionPF) {
+        /**
+         * @param {ERef<AuctioneerPublicFacet>} auctionPF
+         * @param {{ absValue: BigInt }} timestamp
+         */
+        async liquidateVaults(auctionPF, timestamp) {
           const { state, facets } = this;
           const { self, helper } = facets;
           const {
@@ -1197,6 +1246,12 @@ export const prepareVaultManagerKit = (
               ),
           );
 
+          const {
+            preAuctionRecorderKit,
+            postAuctionRecorderKit,
+            auctionResultRecorderKit,
+          } = await helper.liquidationRecorderKits(timestamp);
+
           // This is expected to wait for the duration of the auction, which
           // is controlled by the auction parameters startFrequency, clockStep,
           // and the difference between startingRate and lowestRate.
@@ -1272,9 +1327,15 @@ export const prepareVaultManagerKit = (
     const metricsStorageNode = await E(
       externalParams.storageNode,
     ).makeChildNode('metrics');
+
+    const liquidationsStorageNode = await E(
+      externalParams.storageNode,
+    ).makeChildNode('liquidations');
+
     return makeVaultManagerKitInternal({
       ...externalParams,
       metricsStorageNode,
+      liquidationsStorageNode,
     });
   };
   return makeVaultManagerKit;
