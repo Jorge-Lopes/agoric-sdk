@@ -147,7 +147,6 @@ export const setupServices = async (
    *   VFC['publicFacet'],
    *   VaultManager,
    *   AuctioneerKit,
-   *   ManualPriceAuthority,
    *   CollateralManager,
    * ]}
    */
