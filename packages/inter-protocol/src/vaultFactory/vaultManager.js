@@ -223,12 +223,12 @@ export const watchQuoteNotifier = async (notifierP, watcher, ...args) => {
  * }[]} PostAuctionState
  *
  * @typedef {{
- *   collateralForReserve: Amount<'nat'>;
- *   shortfallToReserve: Amount<'nat'>;
- *   mintedProceeds: Amount<'nat'>;
- *   collateralSold: Amount<'nat'>;
- *   collateralRemaining: Amount<'nat'>;
- *   endTime: Timestamp;
+ *   collateralForReserve?: Amount<'nat'>;
+ *   shortfallToReserve?: Amount<'nat'>;
+ *   mintedProceeds?: Amount<'nat'>;
+ *   collateralSold?: Amount<'nat'>;
+ *   collateralRemaining?: Amount<'nat'>;
+ *   endTime?: import('@agoric/time').TimestampRecord | null;
  * }} AuctionResultState
  */
 // any b/c will be filled after start()
@@ -253,7 +253,8 @@ export const prepareVaultManagerKit = (
   const makeVault = prepareVault(baggage, makeRecorderKit, zcf);
 
   /**
-   * @param {HeldParams & { metricsStorageNode: StorageNode } & {
+   * @param {HeldParams & {
+   *   metricsStorageNode: StorageNode;
    *   liquidationsStorageNode: StorageNode;
    * }} params
    * @returns {HeldParams & ImmutableState & MutableState}
@@ -880,9 +881,9 @@ export const prepareVaultManagerKit = (
             state: { liquidationsStorageNode },
           } = this;
 
-          const timestampStorageNode = await E(
-            liquidationsStorageNode,
-          ).makeChildNode(`liquidation${timestamp.absValue}`);
+          const timestampStorageNode = E(liquidationsStorageNode).makeChildNode(
+            `${timestamp.absValue}`,
+          );
 
           const [
             preAuctionStorageNode,
@@ -1300,11 +1301,13 @@ export const prepareVaultManagerKit = (
           // This is expected to wait for the duration of the auction, which
           // is controlled by the auction parameters startFrequency, clockStep,
           // and the difference between startingRate and lowestRate.
-          const [liquidationRecorderKits, proceeds] = await Promise.all([
-            helper.liquidationRecorderKits(timestamp),
-            deposited,
-            userSeatPromise,
-          ]);
+          const [liquidationRecorderKits, auctionSchedule, proceeds] =
+            await Promise.all([
+              helper.liquidationRecorderKits(timestamp),
+              E(auctionPF).getSchedules(),
+              deposited,
+              userSeatPromise,
+            ]);
 
           const { storedCollateralQuote } = collateralEphemera(
             this.state.collateralBrand,
@@ -1358,21 +1361,17 @@ export const prepareVaultManagerKit = (
           for (const [key, value] of vaultData.entries()) {
             const vaultIdInManager = await E(key).getVaultId();
             const preAuctionVaultData = {
-              vaultId: vaultIdInManager,
+              vaultId: `vault${vaultIdInManager}`,
               collateral: value.collateralAmount,
               debt: value.debtAmount,
             };
             preAuctionState.push(preAuctionVaultData);
           }
 
-          const auctionEndTime = (await E(auctionPF).getSchedules())
-            .nextAuctionSchedule?.endTime;
-
-          // FIXME(5): the type of auctionEndTime {TimestampRecord | undefined} needs to match the type of endTime {Timestamp}
-          ///** @type {AuctionResultState} */
+          /** @type {AuctionResultState} */
           const auctionResultState = {
             ...planAuctionResult,
-            endTime: auctionEndTime,
+            endTime: auctionSchedule.nextAuctionSchedule?.endTime,
           };
 
           void helper.writeLiquidations(liquidationRecorderKits, {
@@ -1406,17 +1405,14 @@ export const prepareVaultManagerKit = (
   /**
    * @param {Omit<
    *   Parameters<typeof makeVaultManagerKitInternal>[0],
-   *   'metricsStorageNode'
+   *   'metricsStorageNode' | 'liquidationsStorageNode'
    * >} externalParams
    */
   const makeVaultManagerKit = async externalParams => {
-    const metricsStorageNode = await E(
-      externalParams.storageNode,
-    ).makeChildNode('metrics');
-
-    const liquidationsStorageNode = await E(
-      externalParams.storageNode,
-    ).makeChildNode('liquidations');
+    const [metricsStorageNode, liquidationsStorageNode] = await Promise.all([
+      E(externalParams.storageNode).makeChildNode('metrics'),
+      E(externalParams.storageNode).makeChildNode('liquidations'),
+    ]);
 
     return makeVaultManagerKitInternal({
       ...externalParams,
