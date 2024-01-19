@@ -207,6 +207,30 @@ export const watchQuoteNotifier = async (notifierP, watcher, ...args) => {
  *   storedCollateralQuote: PriceQuote | null;
  * }}
  */
+
+/**
+ * @typedef {{
+ *   vaultId: string;
+ *   collateral: Amount<'nat'>;
+ *   debt: Amount<'nat'>;
+ * }[]} PreAuctionState
+ *
+ * @typedef {{
+ *   vaultId: string;
+ *   collateral: Amount<'nat'>;
+ *   debt: Amount<'nat'>;
+ *   phase: string;
+ * }[]} PostAuctionState
+ *
+ * @typedef {{
+ *   collateralForReserve: Amount<'nat'>;
+ *   shortfallToReserve: Amount<'nat'>;
+ *   mintedProceeds: Amount<'nat'>;
+ *   collateralSold: Amount<'nat'>;
+ *   collateralRemaining: Amount<'nat'>;
+ *   endTime: Timestamp;
+ * }} AuctionResultState
+ */
 // any b/c will be filled after start()
 const collateralEphemera = makeEphemeraProvider(() => /** @type {any} */ ({}));
 
@@ -654,6 +678,33 @@ export const prepareVaultManagerKit = (
           });
 
           return E(metricsTopicKit.recorder).write(payload);
+        },
+
+        /**
+         * @param {{
+         *   preAuctionRecorderKit: any;
+         *   postAuctionRecorderKit: any;
+         *   auctionResultRecorderKit: any;
+         * }} liquidationRecorderKits
+         * @param {{
+         *   preAuctionState: PreAuctionState;
+         *   postAuctionState: any;
+         *   auctionResultState: any;
+         * }} liquidationPayloads
+         */
+        writeLiquidations(liquidationRecorderKits, liquidationPayloads) {
+          const {
+            preAuctionRecorderKit,
+            postAuctionRecorderKit,
+            auctionResultRecorderKit,
+          } = liquidationRecorderKits;
+
+          const { preAuctionState, postAuctionState, auctionResultState } =
+            liquidationPayloads;
+
+          preAuctionRecorderKit.recorder.writeFinal(preAuctionState);
+          postAuctionRecorderKit.recorder.writeFinal(postAuctionState);
+          auctionResultRecorderKit.recorder.writeFinal(auctionResultState);
         },
 
         /**
@@ -1246,21 +1297,20 @@ export const prepareVaultManagerKit = (
               ),
           );
 
-          const {
-            preAuctionRecorderKit,
-            postAuctionRecorderKit,
-            auctionResultRecorderKit,
-          } = await helper.liquidationRecorderKits(timestamp);
-
           // This is expected to wait for the duration of the auction, which
           // is controlled by the auction parameters startFrequency, clockStep,
           // and the difference between startingRate and lowestRate.
-          const [proceeds] = await Promise.all([deposited, userSeatPromise]);
+          const [liquidationRecorderKits, proceeds] = await Promise.all([
+            helper.liquidationRecorderKits(timestamp),
+            deposited,
+            userSeatPromise,
+          ]);
 
           const { storedCollateralQuote } = collateralEphemera(
             this.state.collateralBrand,
           );
 
+          let planAuctionResult;
           trace(`LiqV after long wait`, proceeds);
           try {
             const { plan, vaultsInPlan } = helper.planProceedsDistribution(
@@ -1282,6 +1332,14 @@ export const prepareVaultManagerKit = (
               totalDebt,
               vaultsInPlan,
             });
+
+            planAuctionResult = {
+              collateralForReserve: plan.collateralForReserve,
+              shortfallToReserve: plan.shortfallToReserve,
+              mintedProceeds: plan.mintedProceeds,
+              collateralSold: plan.collateralSold,
+              collateralRemaining: plan.collatRemaining,
+            };
           } catch (err) {
             console.error('🚨 Error distributing proceeds:', err);
           }
@@ -1294,6 +1352,34 @@ export const prepareVaultManagerKit = (
           }
 
           void helper.writeMetrics();
+
+          /** @type {PreAuctionState} */
+          let preAuctionState = [];
+          for (const [key, value] of vaultData.entries()) {
+            const vaultIdInManager = await E(key).getVaultId();
+            const preAuctionVaultData = {
+              vaultId: vaultIdInManager,
+              collateral: value.collateralAmount,
+              debt: value.debtAmount,
+            };
+            preAuctionState.push(preAuctionVaultData);
+          }
+
+          const auctionEndTime = (await E(auctionPF).getSchedules())
+            .nextAuctionSchedule?.endTime;
+
+          // FIXME(5): the type of auctionEndTime {TimestampRecord | undefined} needs to match the type of endTime {Timestamp}
+          ///** @type {AuctionResultState} */
+          const auctionResultState = {
+            ...planAuctionResult,
+            endTime: auctionEndTime,
+          };
+
+          void helper.writeLiquidations(liquidationRecorderKits, {
+            preAuctionState,
+            postAuctionState: [],
+            auctionResultState,
+          });
         },
       },
     },
