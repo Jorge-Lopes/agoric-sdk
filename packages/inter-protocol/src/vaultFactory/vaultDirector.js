@@ -390,10 +390,6 @@ const prepareVaultDirector = (
 
           const collateralUnit = await unitAmount(collateralBrand);
 
-          /* FIXME(#5): after including the liquidationsStorageNode as an argument for makeVaultManagerKitInternal
-          * an error is triggered by missing that attribute
-          */
-           // @ts-ignore
           const kit = await makeVaultManagerKit({
             debtMint,
             collateralBrand,
