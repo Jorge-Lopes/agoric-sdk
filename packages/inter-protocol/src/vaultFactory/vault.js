@@ -131,6 +131,7 @@ export const VaultI = M.interface('Vault', {
   getCurrentDebt: M.call().returns(AmountShape),
   getNormalizedDebt: M.call().returns(AmountShape),
   getVaultSeat: M.call().returns(SeatShape),
+  getVaultId: M.call().returns(M.any()),
   initVaultKit: M.call(SeatShape, StorageNodeShape).returns(M.promise()),
   liquidated: M.call().returns(undefined),
   liquidating: M.call().returns(undefined),
@@ -595,6 +596,10 @@ export const prepareVault = (baggage, makeRecorderKit, zcf) => {
       self: {
         getVaultSeat() {
           return this.state.vaultSeat;
+        },
+
+        getVaultId() {
+          return this.state.idInManager;
         },
 
         /**
