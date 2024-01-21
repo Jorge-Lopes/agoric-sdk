@@ -7,16 +7,26 @@ import { deeplyFulfilled } from '@endo/marshal';
 import { makeTracer } from '@agoric/internal';
 import { buildManualTimer } from '@agoric/swingset-vat/tools/manual-timer.js';
 import {
+  ceilMultiplyBy,
   makeRatio,
   makeRatioFromAmounts,
 } from '@agoric/zoe/src/contractSupport/index.js';
 import { documentStorageSchema } from '@agoric/governance/tools/storageDoc.js';
+import { AmountMath } from '@agoric/ertp';
 import {
   defaultParamValues,
   legacyOfferResult,
 } from '../vaultFactory/vaultFactoryUtils.js';
-import { SECONDS_PER_HOUR as ONE_HOUR } from '../../src/proposals/econ-behaviors.js';
-import { reserveInitialState } from '../metrics.js';
+import {
+  SECONDS_PER_HOUR as ONE_HOUR,
+  SECONDS_PER_DAY as ONE_DAY,
+  SECONDS_PER_WEEK as ONE_WEEK,
+} from '../../src/proposals/econ-behaviors.js';
+import {
+  reserveInitialState,
+  subscriptionTracker,
+  vaultManagerMetricsTracker,
+} from '../metrics.js';
 import {
   bid,
   setClockAndAdvanceNTimes,
@@ -24,6 +34,7 @@ import {
   setupServices,
   startAuctionClock,
   getDataFromVstorage,
+  openVault,
 } from './tools.js';
 import {
   assertBidderPayout,
@@ -41,7 +52,9 @@ import {
   assertAuctioneerSchedule,
   assertAuctioneerPathData,
   assertVaultData,
+  assertMintedProceeds,
 } from './assertions.js';
+import { Phase } from '../vaultFactory/driver.js';
 
 const trace = makeTracer('TestLiquidationVisibility', false);
 
@@ -178,6 +191,196 @@ test('test vault liquidation', async t => {
     },
   };
   await assertReserveState(t, metricsTopic, 'like', expectedReserveState);
+});
+
+// We'll make a loan, and trigger liquidation via price changes. The interest
+// rate is 40%. The liquidation margin is 105%. The priceAuthority will
+// initially quote 10:1 Run:Aeth, and drop to 7:1. The loan will initially be
+// overcollateralized 100%. Alice will withdraw enough of the overage that
+// she'll get caught when prices drop.
+// A bidder will buy at the 65% level, so there will be a shortfall.
+test('Auction sells all collateral w/shortfall', async t => {
+  const { zoe, aeth, run, rates: defaultRates } = t.context;
+
+  // Add a vaultManager with 10000 aeth collateral at a 200 aeth/Minted rate
+  const rates = harden({
+    ...defaultRates,
+    // charge 40% interest / year
+    interestRate: run.makeRatio(40n),
+    liquidationMargin: run.makeRatio(130n),
+  });
+  t.context.rates = rates;
+
+  // Interest is charged daily, and auctions are every week
+  t.context.interestTiming = {
+    chargingPeriod: ONE_DAY,
+    recordingPeriod: ONE_DAY,
+  };
+
+  const manualTimer = buildManualTimer();
+  const services = await setupServices(
+    t,
+    makeRatio(100n, run.brand, 10n, aeth.brand),
+    aeth.make(1n),
+    manualTimer,
+    ONE_WEEK,
+    { StartFrequency: ONE_HOUR },
+  );
+
+  const {
+    vaultFactory: { aethCollateralManager },
+    aethTestPriceAuthority,
+    reserveKit: { reserveCreatorFacet, reservePublicFacet },
+    auctioneerKit,
+  } = services;
+  await E(reserveCreatorFacet).addIssuer(aeth.issuer, 'Aeth');
+
+  const metricsTopic = await E.get(E(reservePublicFacet).getPublicTopics())
+    .metrics;
+  const m = await assertReserveState(
+    t,
+    metricsTopic,
+    'initial',
+    reserveInitialState(run.makeEmpty()),
+  );
+  let shortfallBalance = 0n;
+
+  const aethVaultMetrics = await vaultManagerMetricsTracker(
+    t,
+    aethCollateralManager,
+  );
+  await aethVaultMetrics.assertInitial({
+    // present
+    numActiveVaults: 0,
+    numLiquidatingVaults: 0,
+    totalCollateral: aeth.make(0n),
+    totalDebt: run.make(0n),
+    retainedCollateral: aeth.make(0n),
+
+    // running
+    numLiquidationsCompleted: 0,
+    numLiquidationsAborted: 0,
+    totalOverageReceived: run.make(0n),
+    totalProceedsReceived: run.make(0n),
+    totalCollateralSold: aeth.make(0n),
+    liquidatingCollateral: aeth.make(0n),
+    liquidatingDebt: run.make(0n),
+    totalShortfallReceived: run.make(0n),
+    lockedQuote: null,
+  });
+
+  // ALICE's loan ////////////////////////////////////////////
+
+  // Create a loan for Alice for 5000 Minted with 1000 aeth collateral
+  // ratio is 4:1
+  const aliceCollateralAmount = aeth.make(1000n);
+  const aliceWantMinted = run.make(5000n);
+  /** @type {UserSeat<VaultKit>} */
+  const aliceVaultSeat = await openVault({
+    t,
+    cm: aethCollateralManager,
+    collateralAmount: aliceCollateralAmount,
+    wantMintedAmount: aliceWantMinted,
+    colKeyword: 'aeth',
+  });
+  const {
+    vault: aliceVault,
+    publicNotifiers: { vault: aliceNotifier },
+  } = await legacyOfferResult(aliceVaultSeat);
+
+  await assertVaultCurrentDebt(t, aliceVault, aliceWantMinted);
+  await assertMintedProceeds(t, aliceVaultSeat, aliceWantMinted);
+  await assertVaultDebtSnapshot(t, aliceNotifier, aliceWantMinted);
+
+  let totalDebt = 5250n;
+  await aethVaultMetrics.assertChange({
+    numActiveVaults: 1,
+    totalCollateral: { value: 1000n },
+    totalDebt: { value: totalDebt },
+  });
+
+  // reduce collateral  /////////////////////////////////////
+
+  trace(t, 'alice reduce collateral');
+
+  // Alice reduce collateral by 300. That leaves her at 700 * 10 > 1.05 * 5000.
+  // Prices will drop from 10 to 7, she'll be liquidated: 700 * 7 < 1.05 * 5000.
+  const collateralDecrement = aeth.make(300n);
+  const aliceReduceCollateralSeat = await E(zoe).offer(
+    E(aliceVault).makeAdjustBalancesInvitation(),
+    harden({
+      want: { Collateral: collateralDecrement },
+    }),
+  );
+  await E(aliceReduceCollateralSeat).getOfferResult();
+
+  trace('alice ');
+  await assertCollateralProceeds(t, aliceReduceCollateralSeat, aeth.make(300n));
+
+  await assertVaultDebtSnapshot(t, aliceNotifier, aliceWantMinted);
+  trace(t, 'alice reduce collateral');
+  await aethVaultMetrics.assertChange({
+    totalCollateral: { value: 700n },
+  });
+
+  await E(aethTestPriceAuthority).setPrice(
+    makeRatio(70n, run.brand, 10n, aeth.brand),
+  );
+  trace(t, 'changed price to 7 RUN/Aeth');
+
+  // A BIDDER places a BID //////////////////////////
+  const bidAmount = run.make(3300n);
+  const desired = aeth.make(700n);
+  const bidderSeat = await bid(t, zoe, auctioneerKit, aeth, bidAmount, desired);
+
+  const { startTime: start1, time: now1 } = await startAuctionClock(
+    auctioneerKit,
+    manualTimer,
+  );
+  let currentTime = now1;
+
+  await aethVaultMetrics.assertChange({
+    lockedQuote: makeRatioFromAmounts(
+      aeth.make(1_000_000n),
+      run.make(7_000_000n),
+    ),
+  });
+
+  // expect Alice to be liquidated because her collateral is too low.
+  await assertVaultState(t, aliceNotifier, Phase.LIQUIDATING);
+
+  currentTime = await setClockAndAdvanceNTimes(manualTimer, 2, start1, 2n);
+
+  await assertVaultState(t, aliceNotifier, Phase.LIQUIDATED);
+  trace(t, 'alice liquidated', currentTime);
+  totalDebt += 30n;
+  await aethVaultMetrics.assertChange({
+    numActiveVaults: 0,
+    numLiquidatingVaults: 1,
+    liquidatingCollateral: { value: 700n },
+    liquidatingDebt: { value: 5250n },
+    lockedQuote: null,
+  });
+
+  shortfallBalance += 2065n;
+  await m.assertChange({
+    shortfallBalance: { value: shortfallBalance },
+  });
+
+  await aethVaultMetrics.assertChange({
+    liquidatingDebt: { value: 0n },
+    liquidatingCollateral: { value: 0n },
+    totalCollateral: { value: 0n },
+    totalDebt: { value: 0n },
+    numLiquidatingVaults: 0,
+    numLiquidationsCompleted: 1,
+    totalCollateralSold: { value: 700n },
+    totalProceedsReceived: { value: 3185n },
+    totalShortfallReceived: { value: shortfallBalance },
+  });
+
+  //  Bidder bought 800 Aeth
+  await assertBidderPayout(t, bidderSeat, run, 115n, aeth, 700n);
 });
 
 test('test liquidate vault with snapshot', async t => {

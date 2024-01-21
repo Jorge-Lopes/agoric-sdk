@@ -1,7 +1,7 @@
 import { E } from '@endo/eventual-send';
 import { makeIssuerKit } from '@agoric/ertp';
 import { unsafeMakeBundleCache } from '@agoric/swingset-vat/tools/bundleTool.js';
-import { allValues, objectMap } from '@agoric/internal';
+import { allValues, makeTracer, objectMap } from '@agoric/internal';
 import { buildManualTimer } from '@agoric/swingset-vat/tools/manual-timer.js';
 import { makeRatioFromAmounts } from '@agoric/zoe/src/contractSupport/index.js';
 import { eventLoopIteration } from '@agoric/internal/src/testing-utils.js';
@@ -13,7 +13,7 @@ import {
   getRunFromFaucet,
   setupElectorateReserveAndAuction,
 } from '../vaultFactory/vaultFactoryUtils.js';
-import { subscriptionTracker } from '../metrics.js';
+import { subscriptionTracker, vaultManagerMetricsTracker } from '../metrics.js';
 import { startVaultFactory } from '../../src/proposals/econ-behaviors.js';
 
 const contractRoots = {
@@ -22,6 +22,8 @@ const contractRoots = {
   reserve: './src/reserve/assetReserve.js',
   auctioneer: './src/auction/auctioneer.js',
 };
+
+const trace = makeTracer('VisibilityTools', true);
 
 export const setupBasics = async zoe => {
   const stableIssuer = await E(zoe).getFeeIssuer();
@@ -147,6 +149,7 @@ export const setupServices = async (
    *   VFC['publicFacet'],
    *   VaultManager,
    *   AuctioneerKit,
+   *   ManualPriceAuthority,
    *   CollateralManager,
    * ]}
    */
@@ -156,6 +159,7 @@ export const setupServices = async (
     vfPublic,
     aethVaultManager,
     auctioneerKit,
+    priceAuthority,
     aethCollateralManager,
   ] = await Promise.all([
     E(consume.agoricNames).lookup('instance', 'VaultFactoryGovernor'),
@@ -163,8 +167,15 @@ export const setupServices = async (
     E.get(consume.vaultFactoryKit).publicFacet,
     aethVaultManagerP,
     consume.auctioneerKit,
+    /** @type {Promise<ManualPriceAuthority>} */ (consume.priceAuthority),
     E(aethVaultManagerP).getPublicFacet(),
   ]);
+  trace(t, 'pa', {
+    governorInstance,
+    vaultFactory,
+    vfPublic,
+    priceAuthority: !!priceAuthority,
+  });
 
   const { g, v } = {
     g: {
@@ -189,6 +200,7 @@ export const setupServices = async (
     governor: g,
     vaultFactory: v,
     runKit: { issuer: run.issuer, brand: run.brand },
+    priceAuthority,
     reserveKit,
     auctioneerKit,
     priceAuthorityAdmin,
@@ -239,6 +251,78 @@ export const bid = async (t, zoe, auctioneerKit, aeth, bidAmount, desired) => {
     { maxBuy: desired, offerPrice: makeRatioFromAmounts(bidAmount, desired) },
   );
   return bidderSeat;
+};
+
+/**
+ * @typedef {object} OpenVaultParams
+ * @property {any} t
+ * @property {CollateralManager} cm
+ * @property {Amount<'nat'>} collateralAmount
+ * @property {string} colKeyword
+ * @property {Amount<'nat'>} wantMintedAmount
+ */
+
+/**
+ * @param {OpenVaultParams} params
+ * @returns {Promise<UserSeat<VaultKit>>}
+ */
+export const openVault = async ({
+  t,
+  cm,
+  collateralAmount,
+  colKeyword,
+  wantMintedAmount,
+}) => {
+  return E(t.context.zoe).offer(
+    await E(cm).makeVaultInvitation(),
+    harden({
+      give: { Collateral: collateralAmount },
+      want: { Minted: wantMintedAmount },
+    }),
+    harden({
+      Collateral: t.context[colKeyword].mint.mintPayment(collateralAmount),
+    }),
+  );
+};
+
+/**
+ * @typedef {object} GetTrackerParams
+ * @property {any} t
+ * @property {CollateralManager} collateralManager
+ * @property {AssetReservePublicFacet} reservePublicFacet
+ */
+
+/**
+ * @typedef {object} Trackers
+ * @property {object | undefined} reserveTracker
+ * @property {object | undefined} collateralManagerTracker
+ */
+
+/**
+ * @param {GetTrackerParams} getTrackerParams
+ * @returns {Promise<Trackers>}
+ */
+export const getMetricTrackers = async ({
+  t,
+  collateralManager,
+  reservePublicFacet,
+}) => {
+  /** @type {Trackers} */
+  const trackers = harden({});
+  if (reservePublicFacet) {
+    const metricsTopic = await E.get(E(reservePublicFacet).getPublicTopics())
+      .metrics;
+    trackers.reserveTracker = await subscriptionTracker(t, metricsTopic);
+  }
+
+  if (collateralManager) {
+    trackers.collateralManagerTracker = await vaultManagerMetricsTracker(
+      t,
+      collateralManager,
+    );
+  }
+
+  return trackers;
 };
 
 export const getBookDataTracker = async (t, auctioneerPublicFacet, brand) => {
