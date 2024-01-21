@@ -47,9 +47,11 @@ export const assertReserveState = async (t, metricsTopic, method, expected) => {
       await m.assertState(expected);
       break;
     default:
-      console.log('Default')
+      console.log('Default');
       break;
   }
+
+  return m;
 };
 
 export const assertVaultCurrentDebt = async (t, vault, debt) => {
@@ -81,6 +83,20 @@ export const assertMintedAmount = async (t, vaultSeat, wantMinted) => {
   t.truthy(AmountMath.isEqual(Minted, wantMinted));
 };
 
+export const assertMintedProceeds = async (t, vaultSeat, wantMinted) => {
+  const { Minted } = await E(vaultSeat).getFinalAllocation();
+  const { Minted: proceedsMinted } = await E(vaultSeat).getPayouts();
+
+  t.truthy(AmountMath.isEqual(Minted, wantMinted));
+
+  t.truthy(
+    AmountMath.isEqual(
+      await E(t.context.run.issuer).getAmountOf(proceedsMinted),
+      wantMinted,
+    ),
+  );
+};
+
 export const assertVaultLocked = async (t, vaultNotifier, lockedValue) => {
   const notification = await E(vaultNotifier).getUpdateSince();
   const lockedAmount = notification.value.locked;
@@ -97,6 +113,8 @@ export const assertVaultDebtSnapshot = async (t, vaultNotifier, wantMinted) => {
     debt: AmountMath.add(wantMinted, fee),
     interest: makeRatio(100n, t.context.run.brand),
   });
+
+  return notification;
 };
 
 export const assertVaultState = async (t, vaultNotifier, phase) => {
@@ -104,6 +122,8 @@ export const assertVaultState = async (t, vaultNotifier, phase) => {
   const vaultState = notification.value.vaultState;
 
   t.is(vaultState, phase);
+
+  return notification;
 };
 
 export const assertVaultSeatExited = async (t, vaultSeat) => {
@@ -122,16 +142,18 @@ export const assertVaultFactoryRewardAllocation = async (
   });
 };
 
-export const assertCollateralProceeds = async (
-  t,
-  proceedsCollateralPayment,
-  collProceedsValue,
-) => {
-  const collProceeds = await t.context.aeth.issuer.getAmountOf(
-    proceedsCollateralPayment,
-  );
+export const assertCollateralProceeds = async (t, seat, colWanted) => {
+  const { Collateral: withdrawnCol } = await E(seat).getFinalAllocation();
+  const proceeds4 = await E(seat).getPayouts();
+  t.deepEqual(withdrawnCol, colWanted);
 
-  t.deepEqual(collProceeds, t.context.aeth.make(collProceedsValue));
+  const collateralWithdrawn = await proceeds4.Collateral;
+  t.truthy(
+    AmountMath.isEqual(
+      await E(t.context.aeth.issuer).getAmountOf(collateralWithdrawn),
+      colWanted,
+    ),
+  );
 };
 
 // Update these assertions to use a tracker similar to test-auctionContract
