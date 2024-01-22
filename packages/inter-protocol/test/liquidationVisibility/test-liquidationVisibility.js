@@ -10,7 +10,6 @@ import {
   makeRatio,
   makeRatioFromAmounts,
 } from '@agoric/zoe/src/contractSupport/index.js';
-import { documentStorageSchema } from '@agoric/governance/tools/storageDoc.js';
 import {
   defaultParamValues,
   legacyOfferResult,
@@ -27,7 +26,6 @@ import {
   setupBasics,
   setupServices,
   startAuctionClock,
-  getDataFromVstorage,
   openVault,
   getMetricTrackers,
   adjustVault,
@@ -45,10 +43,6 @@ import {
   assertVaultLocked,
   assertVaultSeatExited,
   assertVaultState,
-  assertBookData,
-  assertAuctioneerSchedule,
-  assertAuctioneerPathData,
-  assertVaultData,
   assertMintedProceeds,
 } from './assertions.js';
 import { Phase } from '../vaultFactory/driver.js';
