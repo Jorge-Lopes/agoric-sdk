@@ -333,6 +333,20 @@ export const adjustVault = async ({ t, vault, proposal, payment }) => {
 };
 
 /**
+ * @typedef {object} CloseVaultParams
+ * @property {Vault} vault
+ * @property {object} t
+ */
+
+/**
+ * @param {CloseVaultParams} closeVaultParams
+ * @returns {Promise<UserSeat>}
+ */
+export const closeVault = async ({ t, vault }) => {
+  return E(t.context.zoe).offer(E(vault).makeCloseInvitation());
+};
+
+/**
  * @typedef {object} GetTrackerParams
  * @property {any} t
  * @property {CollateralManager} collateralManager
