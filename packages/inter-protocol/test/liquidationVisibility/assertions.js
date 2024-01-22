@@ -33,25 +33,21 @@ export const assertBidderPayout = async (
     ));
 };
 
-export const assertReserveState = async (t, metricsTopic, method, expected) => {
-  const m = await subscriptionTracker(t, metricsTopic);
-
+export const assertReserveState = async (metricTracker, method, expected) => {
   switch (method) {
     case 'initial':
-      await m.assertInitial(expected);
+      await metricTracker.assertInitial(expected);
       break;
     case 'like':
-      await m.assertLike(expected);
+      await metricTracker.assertLike(expected);
       break;
     case 'state':
-      await m.assertState(expected);
+      await metricTracker.assertState(expected);
       break;
     default:
       console.log('Default');
       break;
   }
-
-  return m;
 };
 
 export const assertVaultCurrentDebt = async (t, vault, debt) => {

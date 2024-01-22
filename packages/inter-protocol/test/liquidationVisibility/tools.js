@@ -8,6 +8,7 @@ import { eventLoopIteration } from '@agoric/internal/src/testing-utils.js';
 import { TimeMath } from '@agoric/time';
 import { subscribeEach } from '@agoric/notifier';
 import '../../src/vaultFactory/types.js';
+import exp from 'constants';
 import { withAmountUtils } from '../supports.js';
 import {
   getRunFromFaucet,
@@ -286,6 +287,52 @@ export const openVault = async ({
 };
 
 /**
+ * @typedef {object} AdjustVaultParams
+ * @property {object} t
+ * @property {Vault} vault
+ * @property {{
+ *   want: [
+ *     {
+ *       Collateral: Amount<'nat'>;
+ *       Minted: Amount<'nat'>;
+ *     },
+ *   ];
+ *   give: [
+ *     {
+ *       Collateral: Amount<'nat'>;
+ *       Minted: Amount<'nat'>;
+ *     },
+ *   ];
+ * }} proposal
+ * @property {{
+ *   want: [
+ *     {
+ *       Collateral: Payment;
+ *       Minted: Payment;
+ *     },
+ *   ];
+ *   give: [
+ *     {
+ *       Collateral: Payment;
+ *       Minted: Payment;
+ *     },
+ *   ];
+ * }} [payment]
+ */
+
+/**
+ * @param {AdjustVaultParams} adjustVaultParams
+ * @returns {Promise<UserSeat>}
+ */
+export const adjustVault = async ({ t, vault, proposal, payment }) => {
+  return E(t.context.zoe).offer(
+    E(vault).makeAdjustBalancesInvitation(),
+    harden(proposal),
+    payment,
+  );
+};
+
+/**
  * @typedef {object} GetTrackerParams
  * @property {any} t
  * @property {CollateralManager} collateralManager
@@ -294,8 +341,8 @@ export const openVault = async ({
 
 /**
  * @typedef {object} Trackers
- * @property {object | undefined} reserveTracker
- * @property {object | undefined} collateralManagerTracker
+ * @property {object} [reserveTracker]
+ * @property {object} [collateralManagerTracker]
  */
 
 /**
@@ -308,7 +355,7 @@ export const getMetricTrackers = async ({
   reservePublicFacet,
 }) => {
   /** @type {Trackers} */
-  const trackers = harden({});
+  const trackers = {};
   if (reservePublicFacet) {
     const metricsTopic = await E.get(E(reservePublicFacet).getPublicTopics())
       .metrics;
@@ -322,7 +369,7 @@ export const getMetricTrackers = async ({
     );
   }
 
-  return trackers;
+  return harden(trackers);
 };
 
 export const getBookDataTracker = async (t, auctioneerPublicFacet, brand) => {
