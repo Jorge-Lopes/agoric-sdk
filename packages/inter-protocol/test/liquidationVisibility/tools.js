@@ -8,7 +8,6 @@ import { eventLoopIteration } from '@agoric/internal/src/testing-utils.js';
 import { TimeMath } from '@agoric/time';
 import { subscribeEach } from '@agoric/notifier';
 import '../../src/vaultFactory/types.js';
-import exp from 'constants';
 import { withAmountUtils } from '../supports.js';
 import {
   getRunFromFaucet,
