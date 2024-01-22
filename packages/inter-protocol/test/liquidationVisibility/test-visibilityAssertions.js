@@ -1,9 +1,8 @@
 import { test } from '@agoric/zoe/tools/prepare-test-env-ava.js';
 import { E } from '@endo/far';
-import { makeImportContext} from "@agoric/smart-wallet/src/marshal-contexts.js";
+import { makeImportContext } from '@agoric/smart-wallet/src/marshal-contexts.js';
 import { makeMockChainStorageRoot } from '../supports.js';
-import { getDataFromVstorage } from './tools.js';
-import { assertNodeInStorage } from "./assertions.js";
+import { assertNodeInStorage } from './assertions.js';
 
 const {
   fromBoard: { toCapData },
