@@ -29,8 +29,9 @@ import {
   openVault,
   getMetricTrackers,
   adjustVault,
-  closeVault, getDataFromVstorage
-} from "./tools.js";
+  closeVault,
+  getDataFromVstorage,
+} from './tools.js';
 import {
   assertBidderPayout,
   assertCollateralProceeds,

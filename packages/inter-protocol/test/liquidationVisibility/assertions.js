@@ -7,8 +7,7 @@ import {
   makeRatio,
 } from '@agoric/zoe/src/contractSupport/index.js';
 import { headValue } from '../supports.js';
-import exp from "constants";
-import { getDataFromVstorage } from "./tools.js";
+import { getDataFromVstorage } from './tools.js';
 
 export const assertBidderPayout = async (
   t,
