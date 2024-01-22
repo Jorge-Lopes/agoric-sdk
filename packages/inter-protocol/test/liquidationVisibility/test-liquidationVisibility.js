@@ -29,8 +29,8 @@ import {
   openVault,
   getMetricTrackers,
   adjustVault,
-  closeVault,
-} from './tools.js';
+  closeVault, getDataFromVstorage
+} from "./tools.js";
 import {
   assertBidderPayout,
   assertCollateralProceeds,
@@ -103,7 +103,11 @@ test('liq-result-scenario-1', async t => {
     aethTestPriceAuthority,
     reserveKit: { reserveCreatorFacet, reservePublicFacet },
     auctioneerKit,
+    chainStorage,
   } = services;
+
+  const storageData = await getDataFromVstorage(chainStorage, 'whatever');
+  t.log(storageData);
 
   const { reserveTracker } = await getMetricTrackers({
     t,

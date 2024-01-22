@@ -7,6 +7,8 @@ import {
   makeRatio,
 } from '@agoric/zoe/src/contractSupport/index.js';
 import { headValue } from '../supports.js';
+import exp from "constants";
+import { getDataFromVstorage } from "./tools.js";
 
 export const assertBidderPayout = async (
   t,
@@ -212,4 +214,14 @@ export const assertVaultData = async (
 ) => {
   const auctioneerBookData = await E(vaultDataSubscriber).getUpdateSince();
   t.deepEqual(auctioneerBookData.value, vaultDataVstorage[0][1]);
+};
+
+export const assertNodeInStorage = async ({
+  t,
+  rootNode,
+  desiredNode,
+  expected,
+}) => {
+  const [...storageData] = await getDataFromVstorage(rootNode, desiredNode);
+  t.is(storageData.length !== 0, expected);
 };
