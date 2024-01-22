@@ -52,6 +52,7 @@ import {
 } from '@agoric/zoe/src/contractSupport/index.js';
 import { PriceQuoteShape, SeatShape } from '@agoric/zoe/src/typeGuards.js';
 import { E } from '@endo/eventual-send';
+import { TimestampShape } from '@agoric/time';
 import { AuctionPFShape } from '../auction/auctioneer.js';
 import {
   checkDebtLimit,
@@ -64,7 +65,6 @@ import { calculateMinimumCollateralization, minimumPrice } from './math.js';
 import { makePrioritizedVaults } from './prioritizedVaults.js';
 import { Phase, prepareVault } from './vault.js';
 import { calculateDistributionPlan } from './proceeds.js';
-import { TimestampShape } from '@agoric/time';
 
 const { details: X, Fail, quote: q } = assert;
 
@@ -707,9 +707,17 @@ export const prepareVaultManagerKit = (
           const { preAuctionState, postAuctionState, auctionResultState } =
             liquidationPayloads;
 
-          preAuctionRecorderKit.recorder.writeFinal(preAuctionState);
-          postAuctionRecorderKit.recorder.writeFinal(postAuctionState);
-          auctionResultRecorderKit.recorder.writeFinal(auctionResultState);
+          const preAuctionResult = E(preAuctionRecorderKit.recorder).write(
+            preAuctionState,
+          );
+          const postAuctionResult = E(postAuctionRecorderKit.recorder).write(
+            postAuctionState,
+          );
+          const auctionResultResult = E(
+            auctionResultRecorderKit.recorder,
+          ).write(auctionResultState);
+
+          return { preAuctionResult, postAuctionResult, auctionResultResult };
         },
 
         /**
@@ -762,7 +770,8 @@ export const prepareVaultManagerKit = (
          * @returns {Promise<PreAuctionState>}
          */
         async getPreAuctionState(vaultData) {
-          let preAuctionState = [];
+          const preAuctionState = [];
+          await null;
           for (const [key, value] of vaultData.entries()) {
             const { idInManager } = await E(key).getVaultState();
             const preAuctionVaultData = {
@@ -786,7 +795,8 @@ export const prepareVaultManagerKit = (
          */
         async getPostAuctionState(postAuctionProceeds) {
           const postAuctionState = [];
-          for (let i = 0; i < postAuctionProceeds.length; i++) {
+          await null;
+          for (let i = 0; i < postAuctionProceeds.length; i += 1) {
             const { keyword, amount, vault } = postAuctionProceeds[i];
 
             const { idInManager, phase } = await E(vault).getVaultState();
@@ -1292,7 +1302,7 @@ export const prepareVaultManagerKit = (
         },
         /**
          * @param {ERef<AuctioneerPublicFacet>} auctionPF
-         * @param {{ absValue: BigInt }} timestamp
+         * @param {{ absValue: bigint }} timestamp
          */
         async liquidateVaults(auctionPF, timestamp) {
           const { state, facets } = this;
@@ -1422,7 +1432,7 @@ export const prepareVaultManagerKit = (
               collateralRemaining: plan.collatRemaining,
             };
 
-            for (let i = 0; i < plan.transfersToVault.length; i++) {
+            for (let i = 0; i < plan.transfersToVault.length; i += 1) {
               const transfer = plan.transfersToVault[i];
               const keyword = Object.keys(transfer[1])[0];
               const amount = Object.values(transfer[1])[0];
