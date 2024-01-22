@@ -35,7 +35,8 @@ import {
   startAuctionClock,
   getDataFromVstorage,
   openVault,
-} from './tools.js';
+  getMetricTrackers, adjustVault
+} from "./tools.js";
 import {
   assertBidderPayout,
   assertCollateralProceeds,
@@ -235,21 +236,20 @@ test('Auction sells all collateral w/shortfall', async t => {
   } = services;
   await E(reserveCreatorFacet).addIssuer(aeth.issuer, 'Aeth');
 
-  const metricsTopic = await E.get(E(reservePublicFacet).getPublicTopics())
-    .metrics;
-  const m = await assertReserveState(
+  const { reserveTracker, collateralManagerTracker } = await getMetricTrackers({
     t,
-    metricsTopic,
+    collateralManager: aethCollateralManager,
+    reservePublicFacet,
+  });
+
+  await assertReserveState(
+    reserveTracker,
     'initial',
     reserveInitialState(run.makeEmpty()),
   );
   let shortfallBalance = 0n;
 
-  const aethVaultMetrics = await vaultManagerMetricsTracker(
-    t,
-    aethCollateralManager,
-  );
-  await aethVaultMetrics.assertInitial({
+  await collateralManagerTracker.assertInitial({
     // present
     numActiveVaults: 0,
     numLiquidatingVaults: 0,
@@ -293,7 +293,7 @@ test('Auction sells all collateral w/shortfall', async t => {
   await assertVaultDebtSnapshot(t, aliceNotifier, aliceWantMinted);
 
   let totalDebt = 5250n;
-  await aethVaultMetrics.assertChange({
+  await collateralManagerTracker.assertChange({
     numActiveVaults: 1,
     totalCollateral: { value: 1000n },
     totalDebt: { value: totalDebt },
@@ -306,12 +306,13 @@ test('Auction sells all collateral w/shortfall', async t => {
   // Alice reduce collateral by 300. That leaves her at 700 * 10 > 1.05 * 5000.
   // Prices will drop from 10 to 7, she'll be liquidated: 700 * 7 < 1.05 * 5000.
   const collateralDecrement = aeth.make(300n);
-  const aliceReduceCollateralSeat = await E(zoe).offer(
-    E(aliceVault).makeAdjustBalancesInvitation(),
-    harden({
+  const aliceReduceCollateralSeat = await adjustVault({
+    t,
+    vault: aliceVault,
+    proposal: {
       want: { Collateral: collateralDecrement },
-    }),
-  );
+    },
+  });
   await E(aliceReduceCollateralSeat).getOfferResult();
 
   trace('alice ');
@@ -319,7 +320,7 @@ test('Auction sells all collateral w/shortfall', async t => {
 
   await assertVaultDebtSnapshot(t, aliceNotifier, aliceWantMinted);
   trace(t, 'alice reduce collateral');
-  await aethVaultMetrics.assertChange({
+  await collateralManagerTracker.assertChange({
     totalCollateral: { value: 700n },
   });
 
@@ -339,7 +340,7 @@ test('Auction sells all collateral w/shortfall', async t => {
   );
   let currentTime = now1;
 
-  await aethVaultMetrics.assertChange({
+  await collateralManagerTracker.assertChange({
     lockedQuote: makeRatioFromAmounts(
       aeth.make(1_000_000n),
       run.make(7_000_000n),
@@ -353,8 +354,7 @@ test('Auction sells all collateral w/shortfall', async t => {
 
   await assertVaultState(t, aliceNotifier, Phase.LIQUIDATED);
   trace(t, 'alice liquidated', currentTime);
-  totalDebt += 30n;
-  await aethVaultMetrics.assertChange({
+  await collateralManagerTracker.assertChange({
     numActiveVaults: 0,
     numLiquidatingVaults: 1,
     liquidatingCollateral: { value: 700n },
@@ -363,11 +363,11 @@ test('Auction sells all collateral w/shortfall', async t => {
   });
 
   shortfallBalance += 2065n;
-  await m.assertChange({
+  await reserveTracker.assertChange({
     shortfallBalance: { value: shortfallBalance },
   });
 
-  await aethVaultMetrics.assertChange({
+  await collateralManagerTracker.assertChange({
     liquidatingDebt: { value: 0n },
     liquidatingCollateral: { value: 0n },
     totalCollateral: { value: 0n },
