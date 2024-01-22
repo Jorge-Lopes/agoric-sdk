@@ -217,8 +217,8 @@ export const watchQuoteNotifier = async (notifierP, watcher, ...args) => {
  *
  * @typedef {{
  *   vaultId: string;
- *   collateral: Amount<'nat'>;
- *   debt: Amount<'nat'>;
+ *   collateral: Amount<'nat'> | null;
+ *   debt: Amount<'nat'> | null;
  *   phase: string;
  * }[]} PostAuctionState
  *
@@ -1314,6 +1314,7 @@ export const prepareVaultManagerKit = (
           );
 
           let planAuctionResult;
+          let postAuctionProceeds = [];
           trace(`LiqV after long wait`, proceeds);
           try {
             const { plan, vaultsInPlan } = helper.planProceedsDistribution(
@@ -1343,6 +1344,18 @@ export const prepareVaultManagerKit = (
               collateralSold: plan.collateralSold,
               collateralRemaining: plan.collatRemaining,
             };
+
+            for (let i = 0; i < plan.transfersToVault.length; i++) {
+              const transfers = plan.transfersToVault[i];
+              const keyword = Object.keys(transfers[1])[0];
+              const amount = Object.values(transfers[1])[0];
+              const vault = vaultsInPlan[transfers[0]];
+
+              postAuctionProceeds.push({
+                transfers: { keyword, amount },
+                vault,
+              });
+            }
           } catch (err) {
             console.error('🚨 Error distributing proceeds:', err);
           }
@@ -1359,9 +1372,9 @@ export const prepareVaultManagerKit = (
           /** @type {PreAuctionState} */
           let preAuctionState = [];
           for (const [key, value] of vaultData.entries()) {
-            const vaultIdInManager = await E(key).getVaultId();
+            const { idInManager } = await E(key).getVaultState();
             const preAuctionVaultData = {
-              vaultId: `vault${vaultIdInManager}`,
+              vaultId: `vault${idInManager}`,
               collateral: value.collateralAmount,
               debt: value.debtAmount,
             };
@@ -1374,9 +1387,49 @@ export const prepareVaultManagerKit = (
             endTime: auctionSchedule.nextAuctionSchedule?.endTime,
           };
 
+          /** @type {PostAuctionState} */
+          const postAuctionState = [];
+          for (let i = 0; i < postAuctionProceeds.length; i++) {
+            const {
+              vault,
+              transfers: { keyword, amount },
+            } = postAuctionProceeds[i];
+
+            const { idInManager, phase } = await E(vault).getVaultState();
+
+            const vaultPostAuctionState = {
+              vaultId: `vault${idInManager}`,
+              phase,
+              collateral: null,
+              debt: null,
+            };
+
+            let postAuctionPayload;
+            switch (keyword) {
+              case 'Collateral':
+                postAuctionPayload = {
+                  ...vaultPostAuctionState,
+                  collateral: amount,
+                };
+                break;
+              case 'Minted':
+                postAuctionPayload = {
+                  ...vaultPostAuctionState,
+                  debt: amount,
+                };
+                break;
+              default:
+                postAuctionPayload = {
+                  ...vaultPostAuctionState,
+                };
+            }
+
+            postAuctionState.push(postAuctionPayload);
+          }
+
           void helper.writeLiquidations(liquidationRecorderKits, {
             preAuctionState,
-            postAuctionState: [],
+            postAuctionState,
             auctionResultState,
           });
         },
