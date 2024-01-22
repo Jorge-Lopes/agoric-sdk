@@ -35,7 +35,8 @@ import {
   startAuctionClock,
   getDataFromVstorage,
   openVault,
-  getMetricTrackers, adjustVault
+  getMetricTrackers,
+  adjustVault, closeVault
 } from "./tools.js";
 import {
   assertBidderPayout,
@@ -114,27 +115,27 @@ test('test vault liquidation', async t => {
     auctioneerKit,
   } = services;
 
-  const metricsTopic = await E.get(E(reservePublicFacet).getPublicTopics())
-    .metrics;
+  const { reserveTracker } = await getMetricTrackers({
+    t,
+    collateralManager: aethCollateralManager,
+    reservePublicFacet,
+  });
 
   let expectedReserveState = reserveInitialState(run.makeEmpty());
-  await assertReserveState(t, metricsTopic, 'initial', expectedReserveState);
+  await assertReserveState(reserveTracker, 'initial', expectedReserveState);
 
   await E(reserveCreatorFacet).addIssuer(aeth.issuer, 'Aeth');
 
   const collateralAmount = aeth.make(400n);
   const wantMinted = run.make(1600n);
 
-  const vaultSeat = await E(zoe).offer(
-    await E(aethCollateralManager).makeVaultInvitation(),
-    harden({
-      give: { Collateral: collateralAmount },
-      want: { Minted: wantMinted },
-    }),
-    harden({
-      Collateral: aeth.mint.mintPayment(collateralAmount),
-    }),
-  );
+  const vaultSeat = await openVault({
+    t,
+    cm: aethCollateralManager,
+    collateralAmount,
+    colKeyword: 'aeth',
+    wantMintedAmount: wantMinted,
+  });
 
   // A bidder places a bid
   const bidAmount = run.make(2000n);
@@ -176,12 +177,10 @@ test('test vault liquidation', async t => {
   await assertVaultCurrentDebt(t, vault, 0n);
   await assertVaultFactoryRewardAllocation(t, vaultFactory, 80n);
 
-  const closeSeat = await E(zoe).offer(E(vault).makeCloseInvitation());
+  const closeSeat = await closeVault({ t, vault });
   await E(closeSeat).getOfferResult();
 
-  const closeProceeds = await E(closeSeat).getPayouts();
-
-  await assertCollateralProceeds(t, closeProceeds.Collateral, 0n);
+  await assertCollateralProceeds(t, closeSeat, aeth.makeEmpty());
   await assertVaultCollateral(t, vault, 0n);
   await assertBidderPayout(t, bidderSeat, run, 320n, aeth, 400n);
 
@@ -191,7 +190,7 @@ test('test vault liquidation', async t => {
       Fee: undefined,
     },
   };
-  await assertReserveState(t, metricsTopic, 'like', expectedReserveState);
+  await assertReserveState(reserveTracker, 'like', expectedReserveState);
 });
 
 // We'll make a loan, and trigger liquidation via price changes. The interest
@@ -292,11 +291,10 @@ test('Auction sells all collateral w/shortfall', async t => {
   await assertMintedProceeds(t, aliceVaultSeat, aliceWantMinted);
   await assertVaultDebtSnapshot(t, aliceNotifier, aliceWantMinted);
 
-  let totalDebt = 5250n;
   await collateralManagerTracker.assertChange({
     numActiveVaults: 1,
     totalCollateral: { value: 1000n },
-    totalDebt: { value: totalDebt },
+    totalDebt: { value: 5250n },
   });
 
   // reduce collateral  /////////////////////////////////////
