@@ -7,12 +7,10 @@ import { deeplyFulfilled } from '@endo/marshal';
 import { makeTracer } from '@agoric/internal';
 import { buildManualTimer } from '@agoric/swingset-vat/tools/manual-timer.js';
 import {
-  ceilMultiplyBy,
   makeRatio,
   makeRatioFromAmounts,
 } from '@agoric/zoe/src/contractSupport/index.js';
 import { documentStorageSchema } from '@agoric/governance/tools/storageDoc.js';
-import { AmountMath } from '@agoric/ertp';
 import {
   defaultParamValues,
   legacyOfferResult,
@@ -22,11 +20,7 @@ import {
   SECONDS_PER_DAY as ONE_DAY,
   SECONDS_PER_WEEK as ONE_WEEK,
 } from '../../src/proposals/econ-behaviors.js';
-import {
-  reserveInitialState,
-  subscriptionTracker,
-  vaultManagerMetricsTracker,
-} from '../metrics.js';
+import { reserveInitialState } from '../metrics.js';
 import {
   bid,
   setClockAndAdvanceNTimes,
@@ -36,8 +30,9 @@ import {
   getDataFromVstorage,
   openVault,
   getMetricTrackers,
-  adjustVault, closeVault
-} from "./tools.js";
+  adjustVault,
+  closeVault,
+} from './tools.js';
 import {
   assertBidderPayout,
   assertCollateralProceeds,

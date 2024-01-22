@@ -7,7 +7,6 @@ import {
   makeRatio,
 } from '@agoric/zoe/src/contractSupport/index.js';
 import { headValue } from '../supports.js';
-import { subscriptionTracker } from '../metrics.js';
 
 export const assertBidderPayout = async (
   t,
