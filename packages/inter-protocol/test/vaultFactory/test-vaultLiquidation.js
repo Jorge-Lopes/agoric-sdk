@@ -248,6 +248,7 @@ const setupServices = async (
 
   return {
     zoe,
+    space,
     timer,
     governor: g,
     vaultFactory: v,
@@ -510,6 +511,27 @@ test('price drop', async t => {
       Fee: undefined,
     },
   });
+
+
+  const storage = await services.space.consume.chainStorage;
+  const node = 'vaultFactory.managers.manager0.liquidations.3600.auctionResult';
+
+  // @ts-ignore
+  const illustration = [...storage.keys()].sort().map(
+    /** @type {(k: string) => [string, unknown]} */
+    key => [
+      key.replace('mockChainStorageRoot.', 'published.'),
+      // @ts-ignore
+      storage.getBody(key),
+    ],
+  );
+
+  const pruned = illustration.filter(
+    node ? ([key, _]) => key.startsWith(`published.${node}`) : _entry => true,
+  );
+
+  console.log(pruned[0][1]);
+
 });
 
 test('price falls precipitously', async t => {
@@ -2768,6 +2790,30 @@ test('refund to one of two loans', async t => {
       Fee: undefined,
     },
   });
+
+
+  const storage = await services.space.consume.chainStorage;
+  const node = 'vaultFactory.managers.manager0.liquidations.3600.vaults.';
+
+  // @ts-ignore
+  const illustration = [...storage.keys()].sort().map(
+    /** @type {(k: string) => [string, unknown]} */
+    key => [
+      key.replace('mockChainStorageRoot.', 'published.'),
+      // @ts-ignore
+      storage.getBody(key),
+    ],
+  );
+
+  const pruned = illustration.filter(
+    node ? ([key, _]) => key.startsWith(`published.${node}`) : _entry => true,
+  );
+
+  console.log('LOG: preAuction', pruned[1][1]);
+
+  console.log('LOG: postAuction', pruned[0][1]);
+
+
 });
 
 test('Bug 7784 reconstitute both', async t => {
