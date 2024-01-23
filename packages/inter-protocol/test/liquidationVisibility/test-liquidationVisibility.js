@@ -232,6 +232,7 @@ test('liq-result-scenario-2', async t => {
     reserveKit: { reserveCreatorFacet, reservePublicFacet },
     auctioneerKit,
     chainStorage,
+    board,
   } = services;
   await E(reserveCreatorFacet).addIssuer(aeth.issuer, 'Aeth');
 
@@ -361,6 +362,7 @@ test('liq-result-scenario-2', async t => {
   // await assertStorageData({
   //   t,
   //   storageRoot: chainStorage,
+  //   board,
   //   path: `vaultFactory.managers.manager0.liquidations.${now1}.preAuction`, // now1 is the nominal start time
   //   expected: [
   //     [
@@ -409,6 +411,7 @@ test('liq-result-scenario-2', async t => {
   // await assertStorageData({
   //   t,
   //   storageRoot: chainStorage,
+  //   board,
   //   path: `vaultFactory.managers.manager0.liquidations.${now1}.postAuction`, // now1 is the nominal start time
   //   expected: [
   //     [
@@ -426,6 +429,7 @@ test('liq-result-scenario-2', async t => {
   // await assertStorageData({
   //   t,
   //   storageRoot: chainStorage,
+  //   board,
   //   path: `vaultFactory.managers.manager0.liquidations.${now1}.auctionResult`, // now1 is the nominal start time
   //   expected: {
   //     collateralForReserve: aeth.makeEmpty(),

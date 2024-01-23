@@ -9,6 +9,7 @@ import {
 import { TimeMath } from '@agoric/time';
 import { headValue } from '../supports.js';
 import { getDataFromVstorage } from './tools.js';
+import exp from "constants";
 
 export const assertBidderPayout = async (
   t,
@@ -246,8 +247,19 @@ export const assertLiqNodeForAuctionCreated = async ({
   });
 };
 
-export const assertStorageData = async ({ t, path, storageRoot, expected }) => {
+export const assertStorageData = async ({
+  t,
+  path,
+  storageRoot,
+  board,
+  expected,
+}) => {
+  /** @typedef {import('@endo/marshal').Marshal<any>} Marshal */
+  /** @type Marshal */
+  const marshaller = await E(board).getReadonlyMarshaller();
+  const expectedCapData = marshaller.toCapData(expected);
+
   /** @type Array */
   const [[, value]] = await getDataFromVstorage(storageRoot, path);
-  t.deepEqual(JSON.parse(value), expected);
+  t.deepEqual(value, JSON.stringify(expectedCapData));
 };

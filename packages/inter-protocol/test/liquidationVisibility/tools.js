@@ -152,6 +152,7 @@ export const setupServices = async (
    *   ManualPriceAuthority,
    *   CollateralManager,
    *   chainStorage,
+   *   board,
    * ]}
    */
   const [
@@ -163,6 +164,7 @@ export const setupServices = async (
     priceAuthority,
     aethCollateralManager,
     chainStorage,
+    board,
   ] = await Promise.all([
     E(consume.agoricNames).lookup('instance', 'VaultFactoryGovernor'),
     vaultFactoryCreatorFacetP,
@@ -171,7 +173,8 @@ export const setupServices = async (
     consume.auctioneerKit,
     /** @type {Promise<ManualPriceAuthority>} */ (consume.priceAuthority),
     E(aethVaultManagerP).getPublicFacet(),
-    space.consume.chainStorage,
+    consume.chainStorage,
+    consume.board,
   ]);
   trace(t, 'pa', {
     governorInstance,
@@ -209,6 +212,7 @@ export const setupServices = async (
     priceAuthorityAdmin,
     aethTestPriceAuthority,
     chainStorage,
+    board,
   };
 };
 
