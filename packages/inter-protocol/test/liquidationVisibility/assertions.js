@@ -6,6 +6,7 @@ import {
   ceilMultiplyBy,
   makeRatio,
 } from '@agoric/zoe/src/contractSupport/index.js';
+import { TimeMath } from '@agoric/time';
 import { headValue } from '../supports.js';
 import { getDataFromVstorage } from './tools.js';
 
@@ -223,4 +224,30 @@ export const assertNodeInStorage = async ({
 }) => {
   const [...storageData] = await getDataFromVstorage(rootNode, desiredNode);
   t.is(storageData.length !== 0, expected);
+};
+
+// Currently supports only one collateral manager
+export const assertLiqNodeForAuctionCreated = async ({
+  t,
+  rootNode,
+  auctioneerPF,
+  auctionType = 'next', // 'live' is the other option
+  expected = false,
+}) => {
+  const schedules = await E(auctioneerPF).getSchedules();
+  const { startTime, startDelay } = schedules[`${auctionType}AuctionSchedule`];
+  const nominalStart = TimeMath.subtractAbsRel(startTime, startDelay);
+
+  await assertNodeInStorage({
+    t,
+    rootNode,
+    desiredNode: `vaultFactory.managers.manager0.liquidations.${nominalStart}`,
+    expected,
+  });
+};
+
+export const assertStorageData = async ({ t, path, storageRoot, expected }) => {
+  /** @type Array */
+  const [[, value]] = await getDataFromVstorage(storageRoot, path);
+  t.deepEqual(JSON.parse(value), expected);
 };

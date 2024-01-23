@@ -10,6 +10,7 @@ import {
   makeRatio,
   makeRatioFromAmounts,
 } from '@agoric/zoe/src/contractSupport/index.js';
+import { documentStorageSchema } from '@agoric/governance/tools/storageDoc.js';
 import {
   defaultParamValues,
   legacyOfferResult,
@@ -45,6 +46,9 @@ import {
   assertVaultSeatExited,
   assertVaultState,
   assertMintedProceeds,
+  assertNodeInStorage,
+  assertLiqNodeForAuctionCreated,
+  assertStorageData,
 } from './assertions.js';
 import { Phase } from '../vaultFactory/driver.js';
 
@@ -227,6 +231,7 @@ test('liq-result-scenario-2', async t => {
     aethTestPriceAuthority,
     reserveKit: { reserveCreatorFacet, reservePublicFacet },
     auctioneerKit,
+    chainStorage,
   } = services;
   await E(reserveCreatorFacet).addIssuer(aeth.issuer, 'Aeth');
 
@@ -317,6 +322,13 @@ test('liq-result-scenario-2', async t => {
     totalCollateral: { value: 700n },
   });
 
+  // TODO: UNCOMMENT THIS WHEN SOURCE IS READY
+  // await assertLiqNodeForAuctionCreated({
+  //   t,
+  //   rootNode: chainStorage,
+  //   auctioneerPF: auctioneerKit.publicFacet,
+  // });
+
   await E(aethTestPriceAuthority).setPrice(
     makeRatio(70n, run.brand, 10n, aeth.brand),
   );
@@ -327,10 +339,12 @@ test('liq-result-scenario-2', async t => {
   const desired = aeth.make(700n);
   const bidderSeat = await bid(t, zoe, auctioneerKit, aeth, bidAmount, desired);
 
-  const { startTime: start1, time: now1 } = await startAuctionClock(
-    auctioneerKit,
-    manualTimer,
-  );
+  const {
+    startTime: start1,
+    time: now1,
+    endTime,
+  } = await startAuctionClock(auctioneerKit, manualTimer);
+
   let currentTime = now1;
 
   await collateralManagerTracker.assertChange({
@@ -342,6 +356,22 @@ test('liq-result-scenario-2', async t => {
 
   // expect Alice to be liquidated because her collateral is too low.
   await assertVaultState(t, aliceNotifier, Phase.LIQUIDATING);
+
+  // TODO: Check vaults.preAuction here
+  // await assertStorageData({
+  //   t,
+  //   storageRoot: chainStorage,
+  //   path: `vaultFactory.managers.manager0.liquidations.${now1}.preAuction`, // now1 is the nominal start time
+  //   expected: [
+  //     [
+  //       'vault0',
+  //       {
+  //         collateral: aeth.make(700n),
+  //         debt: await E(aliceVault).getCurrentDebt(),
+  //       },
+  //     ],
+  //   ],
+  // });
 
   currentTime = await setClockAndAdvanceNTimes(manualTimer, 2, start1, 2n);
 
@@ -374,4 +404,42 @@ test('liq-result-scenario-2', async t => {
 
   //  Bidder bought 800 Aeth
   await assertBidderPayout(t, bidderSeat, run, 115n, aeth, 700n);
+
+  // TODO: Check vaults.postAuction and auctionResults here
+  // await assertStorageData({
+  //   t,
+  //   storageRoot: chainStorage,
+  //   path: `vaultFactory.managers.manager0.liquidations.${now1}.postAuction`, // now1 is the nominal start time
+  //   expected: [
+  //     [
+  //       'vault0',
+  //       {
+  //         collateral: aeth.makeEmpty(),
+  //         debt: run.makeEmpty(),
+  //         phase: Phase.LIQUIDATED,
+  //       },
+  //     ],
+  //   ],
+  // });
+
+  // FIXME: https://github.com/Jorge-Lopes/agoric-sdk-liquidation-visibility/issues/3#issuecomment-1905488335
+  // await assertStorageData({
+  //   t,
+  //   storageRoot: chainStorage,
+  //   path: `vaultFactory.managers.manager0.liquidations.${now1}.auctionResult`, // now1 is the nominal start time
+  //   expected: {
+  //     collateralForReserve: aeth.makeEmpty(),
+  //     shortfallToReserve: run.make(2065n),
+  //     mintedProceeds: run.make(3185n),
+  //     collateralSold: aeth.make(700n),
+  //     collateralRemaining: aeth.makeEmpty(),
+  //     endTime,
+  //   },
+  // });
+
+  // TODO: Snapshot here
+  // await documentStorageSchema(t, chainStorage, {
+  //   note: 'Scenario 2 Liquidation Visibility Snapshot',
+  //   node: `vaultFactory.managers.manager0.liquidations.${now1}`,
+  // });
 });
