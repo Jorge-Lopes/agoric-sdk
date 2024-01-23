@@ -236,7 +236,7 @@ export const setClockAndAdvanceNTimes = async (
 export const startAuctionClock = async (auctioneerKit, manualTimer) => {
   const schedule = await E(auctioneerKit.creatorFacet).getSchedule();
   const priceDelay = await E(auctioneerKit.publicFacet).getPriceLockPeriod();
-  const { startTime, startDelay } = schedule.nextAuctionSchedule;
+  const { startTime, startDelay, endTime } = schedule.nextAuctionSchedule;
   const nominalStart = TimeMath.subtractAbsRel(startTime, startDelay);
   const priceLockTime = TimeMath.subtractAbsRel(nominalStart, priceDelay);
   await manualTimer.advanceTo(TimeMath.absValue(priceLockTime));
@@ -244,7 +244,7 @@ export const startAuctionClock = async (auctioneerKit, manualTimer) => {
 
   await manualTimer.advanceTo(TimeMath.absValue(nominalStart));
   await eventLoopIteration();
-  return { startTime, time: nominalStart };
+  return { startTime, time: nominalStart, endTime };
 };
 
 export const bid = async (t, zoe, auctioneerKit, aeth, bidAmount, desired) => {

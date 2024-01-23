@@ -2,7 +2,7 @@ import { test } from '@agoric/zoe/tools/prepare-test-env-ava.js';
 import { E } from '@endo/far';
 import { makeImportContext } from '@agoric/smart-wallet/src/marshal-contexts.js';
 import { makeMockChainStorageRoot } from '../supports.js';
-import { assertNodeInStorage } from './assertions.js';
+import { assertNodeInStorage, assertStorageData } from './assertions.js';
 
 const {
   fromBoard: { toCapData },
@@ -32,5 +32,18 @@ test('storage-node-created', async t => {
     rootNode: storageRoot,
     desiredNode: 'test',
     expected: true,
+  });
+});
+
+test('storage-assert-data', async t => {
+  const storageRoot = makeMockChainStorageRoot();
+  const testNode = await E(storageRoot).makeChildNode('dummyNode');
+  await writeToStorage(testNode, { dummy: 'foo' });
+
+  await assertStorageData({
+    t,
+    path: 'dummyNode',
+    storageRoot,
+    expected: { dummy: 'foo' },
   });
 });
