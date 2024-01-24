@@ -1,6 +1,7 @@
 import { test } from '@agoric/zoe/tools/prepare-test-env-ava.js';
-import { E } from '@endo/far';
+import { E, Far } from '@endo/far';
 import { makeImportContext } from '@agoric/smart-wallet/src/marshal-contexts.js';
+import { makeScalarBigMapStore } from '@agoric/vat-data';
 import { makeMockChainStorageRoot } from '../supports.js';
 import { assertNodeInStorage, assertStorageData } from './assertions.js';
 
@@ -44,6 +45,48 @@ test('storage-assert-data', async t => {
     t,
     path: 'dummyNode',
     storageRoot,
+    board: {},
     expected: { dummy: 'foo' },
   });
+});
+
+test('map-test-auction', async t => {
+  const vaultData = makeScalarBigMapStore('Vaults');
+
+  vaultData.init(
+    Far('key', { getId: () => 1, getPhase: () => 'liquidated' }),
+    harden({
+      collateral: 19n,
+      debt: 18n,
+    }),
+  );
+  vaultData.init(
+    Far('key1', { getId: () => 2, getPhase: () => 'liquidated' }),
+    harden({
+      collateral: 19n,
+      debt: 18n,
+    }),
+  );
+  vaultData.init(
+    Far('key2', { getId: () => 3, getPhase: () => 'liquidated' }),
+    harden({
+      collateral: 19n,
+      debt: 18n,
+    }),
+  );
+  vaultData.init(
+    Far('key3', { getId: () => 4, getPhase: () => 'liquidated' }),
+    harden({
+      collateral: 19n,
+      debt: 18n,
+    }),
+  );
+
+  const preAuction = [...vaultData.entries()].map(([vault, data]) => [
+    vault.getId(),
+    { ...data, phase: vault.getPhase() }
+  ]);
+  t.log(preAuction);
+
+  t.pass();
 });
