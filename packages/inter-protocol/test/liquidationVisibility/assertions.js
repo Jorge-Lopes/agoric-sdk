@@ -251,15 +251,9 @@ export const assertStorageData = async ({
   t,
   path,
   storageRoot,
-  board,
   expected,
 }) => {
-  /** @typedef {import('@endo/marshal').Marshal<any>} Marshal */
-  /** @type Marshal */
-  const marshaller = await E(board).getReadonlyMarshaller();
-  const expectedCapData = marshaller.toCapData(expected);
-
   /** @type Array */
   const [[, value]] = await getDataFromVstorage(storageRoot, path);
-  t.deepEqual(value, JSON.stringify(expectedCapData));
+  t.deepEqual(value, expected);
 };
