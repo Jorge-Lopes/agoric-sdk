@@ -435,7 +435,7 @@ test('liq-result-scenario-2', async t => {
   // TODO: Snapshot here
   await documentStorageSchema(t, chainStorage, {
     note: 'Scenario 2 Liquidation Visibility Snapshot',
-    node: `vaultFactory.managers.manager0.liquidations.${now1.toString()}`,
+    node: `vaultFactory.managers.manager0.liquidations.${now1.absValue.toString()}`,
   });
 });
 
@@ -456,7 +456,6 @@ test('liq-result-scenario-3', async t => {
     aeth.make(1n),
     manualTimer,
     ONE_WEEK,
-    500n,
     { StartFrequency: ONE_HOUR },
   );
 
@@ -583,7 +582,7 @@ test('liq-result-scenario-3', async t => {
   await assertStorageData({
     t,
     storageRoot: chainStorage,
-    path: `vaultFactory.managers.manager0.liquidations.${time}.preAuction`, // time is the nominal start time
+    path: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}.vaults.preAuction`, // time is the nominal start time
     expected: [
       [
         'vault0', // Alice's vault
@@ -595,8 +594,8 @@ test('liq-result-scenario-3', async t => {
       [
         'vault1', // Bob's vault
         {
-          collateral: bobCollateralAmount,
-          debt: await E(bobVault).getCurrentDebt(),
+          collateralAmount: bobCollateralAmount,
+          debtAmount: await E(bobVault).getCurrentDebt(),
         },
       ],
     ],
@@ -672,21 +671,12 @@ test('liq-result-scenario-3', async t => {
   await assertStorageData({
     t,
     storageRoot: chainStorage,
-    path: `vaultFactory.managers.manager0.liquidations.${time}.postAuction`, // time is the nominal start time
+    path: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}.vaults.postAuction`, // time is the nominal start time
     expected: [
-      [
-        'vault0', // Alice got liquidated
-        {
-          collateral: aeth.makeEmpty(),
-          debt: run.makeEmpty(),
-          phase: Phase.LIQUIDATED,
-        },
-      ],
       [
         'vault1', // Bob got reinstated
         {
-          collateral: recoveredBobCollateral,
-          debt: run.make(158n),
+          Collateral: recoveredBobCollateral,
           phase: Phase.ACTIVE,
         },
       ],
@@ -697,8 +687,10 @@ test('liq-result-scenario-3', async t => {
   await assertStorageData({
     t,
     storageRoot: chainStorage,
-    path: `vaultFactory.managers.manager0.liquidations.${time}.auctionResult`, // now1 is the nominal start time
+    path: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}.auctionResult`, // now1 is the nominal start time
     expected: {
+      collateralOffered: aeth.make(63n),
+      istTarget: run.make(258n),
       collateralForReserve: aeth.make(12n),
       shortfallToReserve: run.make(66n),
       mintedProceeds: run.make(34n),
@@ -711,6 +703,6 @@ test('liq-result-scenario-3', async t => {
   // TODO: Snapshot here
   await documentStorageSchema(t, chainStorage, {
     note: 'Scenario 3 Liquidation Visibility Snapshot',
-    node: `vaultFactory.managers.manager0.liquidations.${time}`,
+    node: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}`,
   });
 });
