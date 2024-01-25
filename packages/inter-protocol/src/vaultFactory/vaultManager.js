@@ -214,7 +214,7 @@ export const watchQuoteNotifier = async (notifierP, watcher, ...args) => {
  *   | { collateralAmount: Amount<'nat'>; debtAmount: Amount<'nat'> }
  * )[][]} PreAuctionState
  *
- * @typedef {(string | { transfer: AmountKeywordRecord; phase: string })[][]} PostAuctionState
+ * @typedef {(string | { phase: string })[][]} PostAuctionState
  *
  * @typedef {{
  *   collateralOffered?: Amount<'nat'>;
@@ -1297,9 +1297,9 @@ export const prepareVaultManagerKit = (
             E(auctionPF).getSchedules(),
             deposited,
             userSeatPromise,
-            E(liquidationRecorderKits.preAuctionRecorderKit.recorder).write(
-              preAuctionState,
-            ),
+            E(
+              liquidationRecorderKits.preAuctionRecorderKit.recorder,
+            ).writeFinal(preAuctionState),
           ]);
 
           const { storedCollateralQuote } = collateralEphemera(
@@ -1341,21 +1341,21 @@ export const prepareVaultManagerKit = (
             };
             void E(
               liquidationRecorderKits.auctionResultRecorderKit.recorder,
-            ).write(auctionResultState);
+            ).writeFinal(auctionResultState);
 
             /** @type PostAuctionState */
             const postAuctionState = plan.transfersToVault.map(
               ([id, transfer]) => [
                 `vault${vaultsInPlan[id].getVaultState().idInManager}`,
                 {
-                  transfer,
+                  ...transfer,
                   phase: vaultsInPlan[id].getVaultState().phase,
                 },
               ],
             );
             void E(
               liquidationRecorderKits.postAuctionRecorderKit.recorder,
-            ).write(postAuctionState);
+            ).writeFinal(postAuctionState);
           } catch (err) {
             console.error('🚨 Error distributing proceeds:', err);
           }
