@@ -2,7 +2,6 @@ import { test } from '@agoric/zoe/tools/prepare-test-env-ava.js';
 import { E, Far } from '@endo/far';
 import { makeScalarBigMapStore } from '@agoric/vat-data';
 import { defaultMarshaller } from '@agoric/internal/src/storage-test-utils.js';
-import { makeFakeBoard } from '@agoric/vats/tools/board-utils.js';
 import { AmountMath, makeIssuerKit } from '@agoric/ertp';
 import { makeMockChainStorageRoot } from '../supports.js';
 import { assertNodeInStorage, assertStorageData } from './assertions.js';

@@ -9,7 +9,6 @@ import {
 import { TimeMath } from '@agoric/time';
 import { headValue } from '../supports.js';
 import { getDataFromVstorage } from './tools.js';
-import exp from "constants";
 
 export const assertBidderPayout = async (
   t,
@@ -247,13 +246,13 @@ export const assertLiqNodeForAuctionCreated = async ({
   });
 };
 
-export const assertStorageData = async ({
-  t,
-  path,
-  storageRoot,
-  expected,
-}) => {
+export const assertStorageData = async ({ t, path, storageRoot, expected }) => {
   /** @type Array */
   const [[, value]] = await getDataFromVstorage(storageRoot, path);
   t.deepEqual(value, expected);
+};
+
+export const assertVaultNotification = async ({ t, notifier, expected }) => {
+  const { value } = await E(notifier).getUpdateSince();
+  t.like(value, expected);
 };
