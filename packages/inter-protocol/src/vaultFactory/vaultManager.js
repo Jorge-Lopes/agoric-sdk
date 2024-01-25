@@ -1337,7 +1337,7 @@ export const prepareVaultManagerKit = (
               mintedProceeds: plan.mintedProceeds,
               collateralSold: plan.collateralSold,
               collateralRemaining: plan.collatRemaining,
-              endTime: auctionSchedule.nextAuctionSchedule?.endTime,
+              endTime: auctionSchedule.liveAuctionSchedule?.endTime,
             };
             void E(
               liquidationRecorderKits.auctionResultRecorderKit.recorder,

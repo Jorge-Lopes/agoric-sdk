@@ -363,7 +363,7 @@ test('liq-result-scenario-2', async t => {
   await assertStorageData({
     t,
     storageRoot: chainStorage,
-    path: `vaultFactory.managers.manager0.liquidations.${now1}.preAuction`, // now1 is the nominal start time
+    path: `vaultFactory.managers.manager0.liquidations.${now1.absValue.toString()}.vaults.preAuction`, // now1 is the nominal start time
     expected: [
       [
         'vault0',
@@ -411,25 +411,18 @@ test('liq-result-scenario-2', async t => {
   await assertStorageData({
     t,
     storageRoot: chainStorage,
-    path: `vaultFactory.managers.manager0.liquidations.${now1}.postAuction`, // now1 is the nominal start time
-    expected: [
-      [
-        'vault0',
-        {
-          collateral: aeth.makeEmpty(),
-          debt: run.makeEmpty(),
-          phase: Phase.LIQUIDATED,
-        },
-      ],
-    ],
+    path: `vaultFactory.managers.manager0.liquidations.${now1.absValue.toString()}.vaults.postAuction`, // now1 is the nominal start time
+    expected: [],
   });
 
   // FIXME: https://github.com/Jorge-Lopes/agoric-sdk-liquidation-visibility/issues/3#issuecomment-1905488335
   await assertStorageData({
     t,
     storageRoot: chainStorage,
-    path: `vaultFactory.managers.manager0.liquidations.${now1}.auctionResult`, // now1 is the nominal start time
+    path: `vaultFactory.managers.manager0.liquidations.${now1.absValue.toString()}.auctionResult`, // now1 is the nominal start time
     expected: {
+      collateralOffered: aeth.make(700n),
+      istTarget: run.make(5250n),
       collateralForReserve: aeth.makeEmpty(),
       shortfallToReserve: run.make(2065n),
       mintedProceeds: run.make(3185n),
@@ -442,7 +435,7 @@ test('liq-result-scenario-2', async t => {
   // TODO: Snapshot here
   await documentStorageSchema(t, chainStorage, {
     note: 'Scenario 2 Liquidation Visibility Snapshot',
-    node: `vaultFactory.managers.manager0.liquidations.${now1}`,
+    node: `vaultFactory.managers.manager0.liquidations.${now1.toString()}`,
   });
 });
 
