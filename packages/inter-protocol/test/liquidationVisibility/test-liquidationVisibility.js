@@ -53,6 +53,7 @@ import {
   assertVaultNotification,
 } from './assertions.js';
 import { Phase } from '../vaultFactory/driver.js';
+import { TimeMath } from '@agoric/time';
 
 const trace = makeTracer('TestLiquidationVisibility', false);
 
@@ -113,9 +114,6 @@ test('liq-result-scenario-1', async t => {
     chainStorage,
   } = services;
 
-  const storageData = await getDataFromVstorage(chainStorage, 'whatever');
-  t.log(storageData);
-
   const { reserveTracker } = await getMetricTrackers({
     t,
     collateralManager: aethCollateralManager,
@@ -154,16 +152,45 @@ test('liq-result-scenario-1', async t => {
   await assertMintedAmount(t, vaultSeat, wantMinted);
   await assertVaultCollateral(t, vault, 400n);
 
+  // Check that no child node with auction start time's name created before the liquidation
+  const vstorageBeforeLiquidation = await getDataFromVstorage(
+    chainStorage,
+    `vaultFactory.managers.manager0.liquidations`,
+  );
+  t.is(vstorageBeforeLiquidation.length, 0);
+
   // drop collateral price from 5:1 to 4:1 and liquidate vault
   aethTestPriceAuthority.setPrice(makeRatio(40n, run.brand, 10n, aeth.brand));
 
   await assertVaultState(t, vaultNotifier, 'active');
 
-  const { startTime, time } = await startAuctionClock(
+  const { startTime, time, endTime } = await startAuctionClock(
     auctioneerKit,
     manualTimer,
   );
   let currentTime = time;
+
+  // Check that {timestamp}.vaults.preAuction values are correct before auction is completed
+  const vstorageDuringLiquidation = await getDataFromVstorage(
+    chainStorage,
+    `vaultFactory.managers.manager0.liquidations`,
+  );
+  t.not(vstorageDuringLiquidation.length, 0);
+  const debtDuringLiquidation = await E(vault).getCurrentDebt();
+  await assertStorageData({
+    t,
+    storageRoot: chainStorage,
+    path: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}.vaults.preAuction`,
+    expected: [
+      [
+        "vault0",
+        {
+          collateralAmount: collateralAmount,
+          debtAmount: debtDuringLiquidation
+        },
+      ]
+    ]
+  });
 
   await assertVaultState(t, vaultNotifier, 'liquidating');
   await assertVaultCollateral(t, vault, 0n);
@@ -192,6 +219,64 @@ test('liq-result-scenario-1', async t => {
     },
   };
   await assertReserveState(reserveTracker, 'like', expectedReserveState);
+
+  // Check that {timestamp}.vaults.postAuction values are correct after auction is completed
+  await assertStorageData({
+    t,
+    storageRoot: chainStorage,
+    path: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}.vaults.preAuction`,
+    expected: [
+      [
+        "vault0",
+        {
+          collateralAmount: collateralAmount,
+          debtAmount: debtDuringLiquidation
+        },
+      ]
+    ]
+  });
+
+  // TODO: postAuction is not filled yet
+  // should be empty
+  // await assertStorageData({
+  //   t,
+  //   storageRoot: chainStorage,
+  //   path: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}.vaults.postAuction`,
+  //   expected: [
+  //     [
+  //       "vault0",
+  //       {
+  //         collateralAmount: collateralAmount,
+  //         debtAmount: debtDuringLiquidation,
+  //         phase: Phase.LIQUIDATED,
+  //       },
+  //     ]
+  //   ]
+  // });
+
+
+  // Check that {timestamp}.auctionResult values are correct after auction is completed
+  await assertStorageData({
+    t,
+    storageRoot: chainStorage,
+    path: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}.auctionResult`,
+    expected: {
+      collateralOffered: collateralAmount,
+      istTarget: run.make(1680n),
+      collateralForReserve: aeth.makeEmpty(),
+      shortfallToReserve: run.makeEmpty(),
+      mintedProceeds: run.make(1680n),
+      collateralSold: aeth.make(400n),
+      collateralRemaining: aeth.makeEmpty(),
+      endTime: endTime,
+    },
+  });
+
+  // Create snapshot of the storage node 
+  await documentStorageSchema(t, chainStorage, {
+    note: 'Scenario 1 Liquidation Visibility Snapshot',
+    node: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}`,
+  });
 });
 
 // We'll make a loan, and trigger liquidation via price changes. The interest
