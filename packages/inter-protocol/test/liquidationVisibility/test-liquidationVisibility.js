@@ -235,23 +235,12 @@ test('liq-result-scenario-1', async t => {
     ],
   });
 
-  // TODO: postAuction is not filled yet
-  // should be empty
-  // await assertStorageData({
-  //   t,
-  //   storageRoot: chainStorage,
-  //   path: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}.vaults.postAuction`,
-  //   expected: [
-  //     [
-  //       "vault0",
-  //       {
-  //         collateralAmount: collateralAmount,
-  //         debtAmount: debtDuringLiquidation,
-  //         phase: Phase.LIQUIDATED,
-  //       },
-  //     ]
-  //   ]
-  // });
+  await assertStorageData({
+    t,
+    storageRoot: chainStorage,
+    path: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}.vaults.postAuction`,
+    expected: [],
+  });
 
   // Check that {timestamp}.auctionResult values are correct after auction is completed
   await assertStorageData({
