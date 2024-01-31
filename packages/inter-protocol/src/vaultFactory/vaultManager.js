@@ -1380,7 +1380,11 @@ export const prepareVaultManagerKit = (
               ),
           );
 
-          // TODO: Explain what happens in here
+          // helper.makeLiquidationVisibilityWriters and schedulesP depends on others vats,
+          // so we switched from Promise.all to Promise.allSettled because if one of those vats fail
+          // we don't want those failures to prevent liquidation process from going forward.
+          // We don't handle the case where 'makeDeposit' rejects as liquidation depends on
+          // 'makeDeposit' being fulfilled.
           await null;
           const [
             { userSeatPromise, deposited },
