@@ -53,7 +53,6 @@ import {
   assertVaultNotification,
 } from './assertions.js';
 import { Phase } from '../vaultFactory/driver.js';
-import { TimeMath } from '@agoric/time';
 
 const trace = makeTracer('TestLiquidationVisibility', false);
 
@@ -183,13 +182,13 @@ test('liq-result-scenario-1', async t => {
     path: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}.vaults.preAuction`,
     expected: [
       [
-        "vault0",
+        'vault0',
         {
-          collateralAmount: collateralAmount,
-          debtAmount: debtDuringLiquidation
+          collateralAmount,
+          debtAmount: debtDuringLiquidation,
         },
-      ]
-    ]
+      ],
+    ],
   });
 
   await assertVaultState(t, vaultNotifier, 'liquidating');
@@ -227,33 +226,21 @@ test('liq-result-scenario-1', async t => {
     path: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}.vaults.preAuction`,
     expected: [
       [
-        "vault0",
+        'vault0',
         {
-          collateralAmount: collateralAmount,
-          debtAmount: debtDuringLiquidation
+          collateralAmount,
+          debtAmount: debtDuringLiquidation,
         },
-      ]
-    ]
+      ],
+    ],
   });
 
-  // TODO: postAuction is not filled yet
-  // should be empty
-  // await assertStorageData({
-  //   t,
-  //   storageRoot: chainStorage,
-  //   path: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}.vaults.postAuction`,
-  //   expected: [
-  //     [
-  //       "vault0",
-  //       {
-  //         collateralAmount: collateralAmount,
-  //         debtAmount: debtDuringLiquidation,
-  //         phase: Phase.LIQUIDATED,
-  //       },
-  //     ]
-  //   ]
-  // });
-
+  await assertStorageData({
+    t,
+    storageRoot: chainStorage,
+    path: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}.vaults.postAuction`,
+    expected: [],
+  });
 
   // Check that {timestamp}.auctionResult values are correct after auction is completed
   await assertStorageData({
@@ -268,11 +255,11 @@ test('liq-result-scenario-1', async t => {
       mintedProceeds: run.make(1680n),
       collateralSold: aeth.make(400n),
       collateralRemaining: aeth.makeEmpty(),
-      endTime: endTime,
+      endTime,
     },
   });
 
-  // Create snapshot of the storage node 
+  // Create snapshot of the storage node
   await documentStorageSchema(t, chainStorage, {
     note: 'Scenario 1 Liquidation Visibility Snapshot',
     node: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}`,

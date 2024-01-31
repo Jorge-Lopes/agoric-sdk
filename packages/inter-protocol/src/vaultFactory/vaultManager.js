@@ -51,7 +51,7 @@ import {
   TopicsRecordShape,
 } from '@agoric/zoe/src/contractSupport/index.js';
 import { PriceQuoteShape, SeatShape } from '@agoric/zoe/src/typeGuards.js';
-import { E } from '@endo/eventual-send';
+import { E, Far } from '@endo/far';
 import { TimestampShape } from '@agoric/time';
 import { AuctionPFShape } from '../auction/auctioneer.js';
 import {
@@ -233,6 +233,9 @@ export const watchQuoteNotifier = async (notifierP, watcher, ...args) => {
  *   auctionResultRecorderKit: import('@agoric/zoe/src/contractSupport/recorder.js').RecorderKit<AuctionResultState>;
  * }} LiquidationRecorderKits
  */
+
+/** @typedef {import('./liquidation.js').VaultData} VaultData */
+
 // any b/c will be filled after start()
 const collateralEphemera = makeEphemeraProvider(() => /** @type {any} */ ({}));
 
@@ -684,7 +687,107 @@ export const prepareVaultManagerKit = (
         },
 
         /**
-         * @param {{ absValue: any }} timestamp
+         * @param {TimestampRecord} timestamp
+         * @returns {Promise<LiquidationVisibilityWriters>}
+         */
+        async makeLiquidationVisibilityWriters(timestamp) {
+          const liquidationRecorderKits =
+            await this.facets.helper.makeLiquidationRecorderKits(timestamp);
+
+          /** @param {VaultData} vaultData */
+          const writePreAuction = vaultData => {
+            /** @type PreAuctionState */
+            const preAuctionState = [...vaultData.entries()].map(
+              ([vault, data]) => [
+                `vault${vault.getVaultState().idInManager}`,
+                { ...data },
+              ],
+            );
+
+            return E(
+              liquidationRecorderKits.preAuctionRecorderKit.recorder,
+            ).writeFinal(preAuctionState);
+          };
+
+          /**
+           * @param {PostAuctionParams} params
+           * @returns {Promise<void>}
+           */
+          const writePostAuction = ({ plan, vaultsInPlan }) => {
+            /** @type PostAuctionState */
+            const postAuctionState = plan.transfersToVault.map(
+              ([id, transfer]) => [
+                `vault${vaultsInPlan[id].getVaultState().idInManager}`,
+                {
+                  ...transfer,
+                  phase: vaultsInPlan[id].getVaultState().phase,
+                },
+              ],
+            );
+            return E(
+              liquidationRecorderKits.postAuctionRecorderKit.recorder,
+            ).writeFinal(postAuctionState);
+          };
+
+          /** @param {AuctionResultsParams} params */
+          const writeAuctionResults = ({
+            plan,
+            totalCollateral,
+            totalDebt,
+            auctionSchedule,
+          }) => {
+            /** @type AuctionResultState */
+            const auctionResultState = {
+              collateralOffered: totalCollateral,
+              istTarget: totalDebt,
+              collateralForReserve: plan.collateralForReserve,
+              shortfallToReserve: plan.shortfallToReserve,
+              mintedProceeds: plan.mintedProceeds,
+              collateralSold: plan.collateralSold,
+              collateralRemaining: plan.collatRemaining,
+              // @ts-expect-error
+              // eslint-disable-next-line @endo/no-optional-chaining
+              endTime: auctionSchedule?.liveAuctionSchedule.endTime,
+            };
+            return E(
+              liquidationRecorderKits.auctionResultRecorderKit.recorder,
+            ).writeFinal(auctionResultState);
+          };
+
+          return Far('Liquidation Visibility Writers', {
+            writePreAuction,
+            writePostAuction,
+            writeAuctionResults,
+          });
+        },
+
+        /**
+         * This method checks if liquidationVisibilityWriters is undefined or
+         * not in case of a rejected promise when creating the writers. If
+         * liquidationVisibilityWriters is undefined it silently notifies the
+         * console. Otherwise, it goes on with the writing.
+         *
+         * @param {LiquidationVisibilityWriters} liquidationVisibilityWriters
+         * @param {[string, object][]} writes
+         */
+        async writeLiqVisibility(liquidationVisibilityWriters, writes) {
+          console.log('WRITES', writes);
+          if (!liquidationVisibilityWriters) {
+            trace(
+              'writeLiqVisibility',
+              `Error: liquidationVisibilityWriters is ${liquidationVisibilityWriters}`,
+            );
+            return;
+          }
+
+          for (const [methodName, params] of writes) {
+            trace('DEBUG', methodName, params);
+            void liquidationVisibilityWriters[methodName](params);
+          }
+        },
+
+        /**
+         * @param {TimestampRecord} timestamp
          * @returns {Promise<LiquidationRecorderKits>}
          */
         async makeLiquidationRecorderKits(timestamp) {
@@ -1193,7 +1296,7 @@ export const prepareVaultManagerKit = (
         },
         /**
          * @param {ERef<AuctioneerPublicFacet>} auctionPF
-         * @param {{ absValue: bigint }} timestamp
+         * @param {TimestampRecord} timestamp
          */
         async liquidateVaults(auctionPF, timestamp) {
           const { state, facets } = this;
@@ -1258,6 +1361,7 @@ export const prepareVaultManagerKit = (
             liquidatingVaults.getSize(),
             totalCollateral,
           );
+          const schedulesP = E(auctionPF).getSchedules();
 
           helper.markLiquidating(totalDebt, totalCollateral);
           void helper.writeMetrics();
@@ -1276,31 +1380,35 @@ export const prepareVaultManagerKit = (
               ),
           );
 
-          const [{ userSeatPromise, deposited }, liquidationRecorderKits] =
-            await Promise.all([
+          // helper.makeLiquidationVisibilityWriters and schedulesP depends on others vats,
+          // so we switched from Promise.all to Promise.allSettled because if one of those vats fail
+          // we don't want those failures to prevent liquidation process from going forward.
+          // We don't handle the case where 'makeDeposit' rejects as liquidation depends on
+          // 'makeDeposit' being fulfilled.
+          await null;
+          const [
+            { userSeatPromise, deposited },
+            liquidationVisibilityWriters,
+            auctionSchedule,
+          ] = (
+            await Promise.allSettled([
               makeDeposit,
-              helper.makeLiquidationRecorderKits(timestamp),
-            ]);
+              helper.makeLiquidationVisibilityWriters(timestamp),
+              schedulesP,
+            ])
+          )
+            .filter(result => result.status === 'fulfilled')
+            // @ts-expect-error
+            .map(result => result.value);
 
-          /** @type PreAuctionState */
-          const preAuctionState = [...vaultData.entries()].map(
-            ([vault, data]) => [
-              `vault${vault.getVaultState().idInManager}`,
-              { ...data },
-            ],
-          );
+          void helper.writeLiqVisibility(liquidationVisibilityWriters, [
+            ['writePreAuction', vaultData],
+          ]);
 
           // This is expected to wait for the duration of the auction, which
           // is controlled by the auction parameters startFrequency, clockStep,
           // and the difference between startingRate and lowestRate.
-          const [auctionSchedule, proceeds] = await Promise.all([
-            E(auctionPF).getSchedules(),
-            deposited,
-            userSeatPromise,
-            E(
-              liquidationRecorderKits.preAuctionRecorderKit.recorder,
-            ).writeFinal(preAuctionState),
-          ]);
+          const [proceeds] = await Promise.all([deposited, userSeatPromise]);
 
           const { storedCollateralQuote } = collateralEphemera(
             this.state.collateralBrand,
@@ -1328,34 +1436,27 @@ export const prepareVaultManagerKit = (
               vaultsInPlan,
             });
 
-            /** @type AuctionResultState */
-            const auctionResultState = {
-              collateralOffered: totalCollateral,
-              istTarget: totalDebt,
-              collateralForReserve: plan.collateralForReserve,
-              shortfallToReserve: plan.shortfallToReserve,
-              mintedProceeds: plan.mintedProceeds,
-              collateralSold: plan.collateralSold,
-              collateralRemaining: plan.collatRemaining,
-              endTime: auctionSchedule.liveAuctionSchedule?.endTime,
-            };
-            void E(
-              liquidationRecorderKits.auctionResultRecorderKit.recorder,
-            ).writeFinal(auctionResultState);
-
-            /** @type PostAuctionState */
-            const postAuctionState = plan.transfersToVault.map(
-              ([id, transfer]) => [
-                `vault${vaultsInPlan[id].getVaultState().idInManager}`,
-                {
-                  ...transfer,
-                  phase: vaultsInPlan[id].getVaultState().phase,
-                },
-              ],
+            void helper.writeLiqVisibility(
+              liquidationVisibilityWriters,
+              harden([
+                [
+                  'writeAuctionResults',
+                  {
+                    plan,
+                    totalCollateral,
+                    totalDebt,
+                    auctionSchedule,
+                  },
+                ],
+                [
+                  'writePostAuction',
+                  {
+                    plan,
+                    vaultsInPlan,
+                  },
+                ],
+              ]),
             );
-            void E(
-              liquidationRecorderKits.postAuctionRecorderKit.recorder,
-            ).writeFinal(postAuctionState);
           } catch (err) {
             console.error('🚨 Error distributing proceeds:', err);
           }
