@@ -51,7 +51,7 @@ import {
   TopicsRecordShape,
 } from '@agoric/zoe/src/contractSupport/index.js';
 import { PriceQuoteShape, SeatShape } from '@agoric/zoe/src/typeGuards.js';
-import { E } from '@endo/eventual-send';
+import { E, Far } from '@endo/far';
 import { TimestampShape } from '@agoric/time';
 import { AuctionPFShape } from '../auction/auctioneer.js';
 import {
@@ -746,18 +746,44 @@ export const prepareVaultManagerKit = (
               collateralSold: plan.collateralSold,
               collateralRemaining: plan.collatRemaining,
               // @ts-expect-error
-              endTime: auctionSchedule.liveAuctionSchedule.endTime, // write if nor rejected
+              // eslint-disable-next-line @endo/no-optional-chaining
+              endTime: auctionSchedule?.liveAuctionSchedule.endTime,
             };
             return E(
               liquidationRecorderKits.auctionResultRecorderKit.recorder,
             ).writeFinal(auctionResultState);
           };
 
-          return harden({
+          return Far('Liquidation Visibility Writers', {
             writePreAuction,
             writePostAuction,
             writeAuctionResults,
           });
+        },
+
+        /**
+         * This method checks if liquidationVisibilityWriters is undefined or
+         * not in case of a rejected promise when creating the writers. If
+         * liquidationVisibilityWriters is undefined it silently notifies the
+         * console. Otherwise, it goes on with the writing.
+         *
+         * @param {LiquidationVisibilityWriters} liquidationVisibilityWriters
+         * @param {[string, object][]} writes
+         */
+        async writeLiqVisibility(liquidationVisibilityWriters, writes) {
+          console.log('WRITES', writes);
+          if (!liquidationVisibilityWriters) {
+            trace(
+              'writeLiqVisibility',
+              `Error: liquidationVisibilityWriters is ${liquidationVisibilityWriters}`,
+            );
+            return;
+          }
+
+          for (const [methodName, params] of writes) {
+            trace('DEBUG', methodName, params);
+            void liquidationVisibilityWriters[methodName](params);
+          }
         },
 
         /**
@@ -1354,22 +1380,31 @@ export const prepareVaultManagerKit = (
               ),
           );
 
-          const [{ userSeatPromise, deposited }, liquidationVisibilityWriters] =
-            await Promise.all([
+          // TODO: Explain what happens in here
+          await null;
+          const [
+            { userSeatPromise, deposited },
+            liquidationVisibilityWriters,
+            auctionSchedule,
+          ] = (
+            await Promise.allSettled([
               makeDeposit,
               helper.makeLiquidationVisibilityWriters(timestamp),
-            ]);
+              schedulesP,
+            ])
+          )
+            .filter(result => result.status === 'fulfilled')
+            // @ts-expect-error
+            .map(result => result.value);
 
-          void liquidationVisibilityWriters.writePreAuction(vaultData);
+          void helper.writeLiqVisibility(liquidationVisibilityWriters, [
+            ['writePreAuction', vaultData],
+          ]);
 
           // This is expected to wait for the duration of the auction, which
           // is controlled by the auction parameters startFrequency, clockStep,
           // and the difference between startingRate and lowestRate.
-          const [auctionSchedule, proceeds] = await Promise.all([
-            schedulesP,
-            deposited,
-            userSeatPromise,
-          ]);
+          const [proceeds] = await Promise.all([deposited, userSeatPromise]);
 
           const { storedCollateralQuote } = collateralEphemera(
             this.state.collateralBrand,
@@ -1397,16 +1432,27 @@ export const prepareVaultManagerKit = (
               vaultsInPlan,
             });
 
-            void liquidationVisibilityWriters.writeAuctionResults({
-              plan,
-              totalCollateral,
-              totalDebt,
-              auctionSchedule,
-            });
-            void liquidationVisibilityWriters.writePostAuction({
-              plan,
-              vaultsInPlan,
-            });
+            void helper.writeLiqVisibility(
+              liquidationVisibilityWriters,
+              harden([
+                [
+                  'writeAuctionResults',
+                  {
+                    plan,
+                    totalCollateral,
+                    totalDebt,
+                    auctionSchedule,
+                  },
+                ],
+                [
+                  'writePostAuction',
+                  {
+                    plan,
+                    vaultsInPlan,
+                  },
+                ],
+              ]),
+            );
           } catch (err) {
             console.error('🚨 Error distributing proceeds:', err);
           }
