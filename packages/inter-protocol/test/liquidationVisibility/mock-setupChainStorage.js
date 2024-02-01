@@ -151,6 +151,7 @@ const prepareChainStorageNode = zone => {
       makeChildNode(name, childNodeOptions = {}) {
         if (blockMakeChildNode === name) {
           console.log(`Log: MOCK makeChildNode REJECTED for node ${name}`);
+          setBlockMakeChildNode('')
           return Promise.reject();
         }
 
