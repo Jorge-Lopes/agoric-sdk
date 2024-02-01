@@ -9,14 +9,14 @@ import { TimeMath } from '@agoric/time';
 import { subscribeEach } from '@agoric/notifier';
 import '../../src/vaultFactory/types.js';
 import { withAmountUtils } from '../supports.js';
-import {
-  getRunFromFaucet,
-  setupElectorateReserveAndAuction,
-} from '../vaultFactory/vaultFactoryUtils.js';
+import { getRunFromFaucet } from '../vaultFactory/vaultFactoryUtils.js';
 import { subscriptionTracker, vaultManagerMetricsTracker } from '../metrics.js';
 import { startVaultFactory } from '../../src/proposals/econ-behaviors.js';
+import { setupElectorateReserveAndAuction } from './mockTools.js';
 
-const contractRoots = {
+export const BASIS_POINTS = 10000n;
+
+let contractRoots = {
   faucet: './test/vaultFactory/faucet.js',
   VaultFactory: './src/vaultFactory/vaultFactory.js',
   reserve: './src/reserve/assetReserve.js',
@@ -25,7 +25,7 @@ const contractRoots = {
 
 const trace = makeTracer('VisibilityTools', true);
 
-export const setupBasics = async zoe => {
+export const setupBasics = async (zoe, contractsWrapper) => {
   const stableIssuer = await E(zoe).getFeeIssuer();
   const stableBrand = await E(stableIssuer).getBrand();
 
@@ -34,6 +34,10 @@ export const setupBasics = async zoe => {
   const aeth = withAmountUtils(
     makeIssuerKit('aEth', 'nat', { decimalPlaces: 6 }),
   );
+
+  if (contractsWrapper) {
+    contractRoots = { ...contractRoots, ...contractsWrapper };
+  }
 
   const bundleCache = await unsafeMakeBundleCache('./bundles/');
   const bundles = await allValues({
