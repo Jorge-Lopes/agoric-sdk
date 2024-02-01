@@ -241,6 +241,18 @@ export const allValues = async obj => {
 };
 
 /**
+ * Just like allValues above but doesn't throw when one of the promises reject.
+ *
+ * @type
+ * { <T extends Record<string, ERef<any>>>(obj: T) => Promise<{ [K in keyof T]: Awaited<T[K]>}> }
+ */
+export const allValuesSettled = async obj => {
+  const resolved = await Promise.allSettled(values(obj));
+  // @ts-expect-error cast
+  return harden(fromEntries(zip(keys(obj), resolved)));
+};
+
+/**
  * A tee implementation where all readers are synchronized with each other.
  * They all consume the source stream in lockstep, and any one returning or
  * throwing early will affect the others.

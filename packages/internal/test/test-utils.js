@@ -12,6 +12,7 @@ import {
   forever,
   deeplyFulfilledObject,
   synchronizedTee,
+  allValuesSettled,
 } from '../src/utils.js';
 
 test('fromUniqueEntries', t => {
@@ -263,4 +264,27 @@ test('synchronizedTee - consume synchronized', async t => {
   t.is(i, 2);
   t.deepEqual(output1, sourceData.slice(0, i));
   t.deepEqual(output2, sourceData.slice(0, i));
+});
+
+test('allValuesSettled', async t => {
+  const result = await allValuesSettled({
+    promiseOne: Promise.resolve('I am a happy promise'),
+    promiseTwo: Promise.reject(new Error('I am an upset promise')),
+    promiseThree: Promise.resolve('I am a happy promise'),
+  });
+
+  t.deepEqual(result.promiseOne, {
+    status: 'fulfilled',
+    value: 'I am a happy promise',
+  });
+
+  t.deepEqual(result.promiseTwo, {
+    status: 'rejected',
+    reason: new Error('I am an upset promise'),
+  });
+
+  t.deepEqual(result.promiseThree, {
+    status: 'fulfilled',
+    value: 'I am a happy promise',
+  });
 });
