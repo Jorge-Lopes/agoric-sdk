@@ -665,6 +665,7 @@ export const start = async (zcf, privateArgs, baggage) => {
           return Promise.reject(Error('getSchedules was forced to reject'));
         } else {
           // eslint-disable-next-line no-use-before-define
+          // eslint-disable-next-line no-use-before-define
           return scheduler.getSchedule();
         }
       },
