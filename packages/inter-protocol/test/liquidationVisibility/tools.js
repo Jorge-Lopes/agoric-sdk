@@ -12,7 +12,7 @@ import { withAmountUtils } from '../supports.js';
 import { getRunFromFaucet } from '../vaultFactory/vaultFactoryUtils.js';
 import { subscriptionTracker, vaultManagerMetricsTracker } from '../metrics.js';
 import { startVaultFactory } from '../../src/proposals/econ-behaviors.js';
-import { setupElectorateReserveAndAuction } from './mockTools.js';
+import { setupElectorateReserveAndAuction } from './mock-setupChainStorage.js';
 
 export const BASIS_POINTS = 10000n;
 
