@@ -4,18 +4,11 @@ import { makeIssuerKit, AssetKind } from '@agoric/ertp';
 import { makeTracer } from '@agoric/internal';
 import { buildManualTimer } from '@agoric/swingset-vat/tools/manual-timer.js';
 import '../../src/vaultFactory/types.js';
-import { installPuppetGovernance, produceInstallations } from '../supports.js';
-import {
-  SECONDS_PER_WEEK,
-  setupReserve,
-  startAuctioneer,
-} from '../../src/proposals/econ-behaviors.js';
 import '@agoric/zoe/exported.js';
 import { makeManualPriceAuthority } from '@agoric/zoe/tools/manualPriceAuthority.js';
 import { makeScalarBigMapStore } from '@agoric/vat-data/src/index.js';
 import { providePriceAuthorityRegistry } from '@agoric/vats/src/priceAuthorityRegistry.js';
 import { makeScriptedPriceAuthority } from '@agoric/zoe/tools/scriptedPriceAuthority.js';
-import { startEconomicCommittee } from '../../src/proposals/startEconCommittee.js';
 import * as utils from '@agoric/vats/src/core/utils.js';
 import { makePromiseSpace, makeAgoricNamesAccess } from '@agoric/vats';
 import { makeFakeBoard } from '@agoric/vats/tools/board-utils.js';
@@ -24,10 +17,19 @@ import { Far } from '@endo/far';
 import { unmarshalFromVstorage } from '@agoric/internal/src/marshal.js';
 import { bindAllMethods } from '@agoric/internal/src/method-tools.js';
 import { defaultMarshaller } from '@agoric/internal/src/storage-test-utils.js';
-import { isStreamCell } from '@agoric/internal/src/lib-chainStorage.js';
+import {
+  isStreamCell,
+  assertPathSegment,
+} from '@agoric/internal/src/lib-chainStorage.js';
 import { makeHeapZone } from '@agoric/base-zone/heap.js';
-import { assertPathSegment } from '@agoric/internal/src/lib-chainStorage.js';
 import * as cb from '@agoric/internal/src/callback.js';
+import { installPuppetGovernance, produceInstallations } from '../supports.js';
+import { startEconomicCommittee } from '../../src/proposals/startEconCommittee.js';
+import {
+  SECONDS_PER_WEEK,
+  setupReserve,
+  startAuctioneer,
+} from '../../src/proposals/econ-behaviors.js';
 
 let blockMakeChildNode = '';
 
@@ -151,7 +153,7 @@ const prepareChainStorageNode = zone => {
       makeChildNode(name, childNodeOptions = {}) {
         if (blockMakeChildNode === name) {
           console.log(`Log: MOCK makeChildNode REJECTED for node ${name}`);
-          setBlockMakeChildNode('')
+          setBlockMakeChildNode('');
           return Promise.reject();
         }
 
@@ -218,6 +220,8 @@ function makeChainStorageRoot(
   const rootNode = makeHeapChainStorageNode(messenger, rootPath, rootOptions);
   return rootNode;
 }
+
+const { Fail } = assert;
 
 /**
  * A map corresponding with a total function such that `get(key)` is assumed to
@@ -396,7 +400,7 @@ const setupBootstrap = async (t, optTimer) => {
 
   const timer = optTimer || buildManualTimer(t.log);
   produce.chainTimerService.resolve(timer);
-  // @ts-ignore
+  // @ts-expect-error
   produce.chainStorage.resolve(makeMockChainStorageRoot());
   produce.board.resolve(makeFakeBoard());
 
