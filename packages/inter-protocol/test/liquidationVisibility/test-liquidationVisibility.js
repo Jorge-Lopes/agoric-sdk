@@ -813,7 +813,7 @@ test('liq-no-vaults', async t => {
     reservePublicFacet,
   });
 
-  let expectedReserveState = reserveInitialState(run.makeEmpty());
+  const expectedReserveState = reserveInitialState(run.makeEmpty());
   await assertReserveState(reserveTracker, 'initial', expectedReserveState);
 
   await E(reserveCreatorFacet).addIssuer(aeth.issuer, 'Aeth');
@@ -937,7 +937,7 @@ test('liq-rejected-schedule', async t => {
 
   await E(auctioneerKit.publicFacet).setRejectGetSchedules(true);
 
-  const { startTime, time, endTime } = await startAuctionClock(
+  const { startTime, time } = await startAuctionClock(
     auctioneerKit,
     manualTimer,
   );
