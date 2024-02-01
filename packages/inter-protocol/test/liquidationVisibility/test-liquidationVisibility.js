@@ -53,6 +53,7 @@ import {
   assertVaultNotification,
 } from './assertions.js';
 import { Phase } from '../vaultFactory/driver.js';
+import { setBlockMakeChildNode } from './mock-setupChainStorage.js';
 
 const trace = makeTracer('TestLiquidationVisibility', false);
 
@@ -1036,3 +1037,66 @@ test('liq-rejected-schedule', async t => {
   });
 });
 
+// Liquidation ends with a happy path
+test('liq-rejected-timestampStorageNode', async t => {
+  const { zoe, run, aeth } = t.context;
+  const manualTimer = buildManualTimer();
+
+  const services = await setupServices(
+    t,
+    makeRatio(50n, run.brand, 10n, aeth.brand),
+    aeth.make(400n),
+    manualTimer,
+    undefined,
+    { StartFrequency: ONE_HOUR },
+  );
+
+  const {
+    vaultFactory: { aethCollateralManager },
+    aethTestPriceAuthority,
+    reserveKit: { reserveCreatorFacet },
+    auctioneerKit,
+    chainStorage,
+  } = services;
+
+  await E(reserveCreatorFacet).addIssuer(aeth.issuer, 'Aeth');
+
+  const collateralAmount = aeth.make(400n);
+  const wantMinted = run.make(1600n);
+
+  const vaultSeat = await openVault({
+    t,
+    cm: aethCollateralManager,
+    collateralAmount,
+    colKeyword: 'aeth',
+    wantMintedAmount: wantMinted,
+  });
+
+  // A bidder places a bid
+  const bidAmount = run.make(2000n);
+  const desired = aeth.make(400n);
+  await bid(t, zoe, auctioneerKit, aeth, bidAmount, desired);
+
+  await legacyOfferResult(vaultSeat);
+
+  // Check that no child node with auction start time's name created before the liquidation
+  const vstorageBeforeLiquidation = await getDataFromVstorage(
+    chainStorage,
+    `vaultFactory.managers.manager0.liquidations`,
+  );
+  t.is(vstorageBeforeLiquidation.length, 0);
+
+  setBlockMakeChildNode('3600');
+
+  // drop collateral price from 5:1 to 4:1 and liquidate vault
+  aethTestPriceAuthority.setPrice(makeRatio(40n, run.brand, 10n, aeth.brand));
+
+  await startAuctionClock(auctioneerKit, manualTimer);
+
+  // Check that {timestamp}.vaults.preAuction values are correct before auction is completed
+  const vstorageDuringLiquidation = await getDataFromVstorage(
+    chainStorage,
+    `vaultFactory.managers.manager0.liquidations`,
+  );
+  t.is(vstorageDuringLiquidation.length, 0);
+});
