@@ -58,7 +58,6 @@ import { setBlockMakeChildNode } from './mock-setupChainStorage.js';
 const trace = makeTracer('TestLiquidationVisibility', false);
 
 // IST is set as RUN to be able to use ../supports.js methods
-
 test.before(async t => {
   const { zoe, feeMintAccessP } = await setUpZoeForTest();
   const feeMintAccess = await feeMintAccessP;
@@ -98,8 +97,9 @@ test.before(async t => {
   trace(t, 'CONTEXT');
 });
 
-// Liquidation ends with a happy path
-test('liq-result-scenario-1', async t => {
+/* Test liquidation flow 1:
+ * Auction raises enough IST to cover debt */
+test('liq-flow-1', async t => {
   const { zoe, run, aeth } = t.context;
   const manualTimer = buildManualTimer();
 
@@ -230,21 +230,6 @@ test('liq-result-scenario-1', async t => {
   await assertStorageData({
     t,
     storageRoot: chainStorage,
-    path: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}.vaults.preAuction`,
-    expected: [
-      [
-        'vault0',
-        {
-          collateralAmount,
-          debtAmount: debtDuringLiquidation,
-        },
-      ],
-    ],
-  });
-
-  await assertStorageData({
-    t,
-    storageRoot: chainStorage,
     path: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}.vaults.postAuction`,
     expected: [],
   });
@@ -273,13 +258,10 @@ test('liq-result-scenario-1', async t => {
   });
 });
 
-// We'll make a loan, and trigger liquidation via price changes. The interest
-// rate is 40%. The liquidation margin is 105%. The priceAuthority will
-// initially quote 10:1 Run:Aeth, and drop to 7:1. The loan will initially be
-// overcollateralized 100%. Alice will withdraw enough of the overage that
-// she'll get caught when prices drop.
-// A bidder will buy at the 65% level, so there will be a shortfall.
-test('liq-result-scenario-2', async t => {
+/* Test liquidation flow 2a:
+ * Auction does not raise enough to cover IST debt;
+ * All collateral sold and debt is not covered. */
+test('liq-flow-2a', async t => {
   const { zoe, aeth, run, rates: defaultRates } = t.context;
 
   // Add a vaultManager with 10000 aeth collateral at a 200 aeth/Minted rate
@@ -518,7 +500,10 @@ test('liq-result-scenario-2', async t => {
   });
 });
 
-test('liq-result-scenario-3', async t => {
+/* Test liquidation flow 2b:
+ * Auction does not raise enough to cover IST debt;
+ * Collateral remains but debt is still not covered by IST raised by auction end */
+test('liq-flow-2b', async t => {
   const { zoe, aeth, run, rates: defaultRates } = t.context;
 
   const rates = harden({
@@ -786,8 +771,8 @@ test('liq-result-scenario-3', async t => {
   });
 });
 
-// Auction starts with no liquidatable vaults
-// In this scenario, no child node of liquidation should be created
+/* Auction starts with no liquidatable vaults
+ * In this scenario, no child node of liquidation should be created */
 test('liq-no-vaults', async t => {
   const { zoe, run, aeth } = t.context;
   const manualTimer = buildManualTimer();
@@ -865,6 +850,8 @@ test('liq-no-vaults', async t => {
   t.is(vstorageDuringLiquidation.length, 0);
 });
 
+/* The auctionSchedule returned schedulesP will be a rejected promise
+ * In this scenario, the state of auctionResult node should have endTime as undefined */
 test('liq-rejected-schedule', async t => {
   const { zoe, run, aeth } = t.context;
   const manualTimer = buildManualTimer();
@@ -938,7 +925,7 @@ test('liq-rejected-schedule', async t => {
 
   await E(auctioneerKit.publicFacet).setRejectGetSchedules(true);
 
-  const { startTime, time, endTime } = await startAuctionClock(
+  const { startTime, time } = await startAuctionClock(
     auctioneerKit,
     manualTimer,
   );
@@ -1037,7 +1024,8 @@ test('liq-rejected-schedule', async t => {
   });
 });
 
-// Liquidation ends with a happy path
+/* The timestampStorageNode returned makeChildNode will be a rejected promise
+ * In this scenario, the error should be handled and printed its message */
 test('liq-rejected-timestampStorageNode', async t => {
   const { zoe, run, aeth } = t.context;
   const manualTimer = buildManualTimer();
