@@ -47,7 +47,9 @@
     "@endo/marshal": "^1.1.0",
     "@endo/nat": "^5.0.2",
     "@endo/promise-kit": "^1.0.2",
-    "jessie.js": "^0.3.2"
+    "jessie.js": "^0.3.2",
+    "@agoric/base-zone": "0.1.1-dev-c4e4693.0",
+    "@endo/patterns": "1.1.0"
   },
   "devDependencies": {
     "@agoric/smart-wallet": "^0.5.3",

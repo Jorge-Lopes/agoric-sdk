@@ -799,7 +799,7 @@ test('liq-no-vaults', async t => {
     reservePublicFacet,
   });
 
-  let expectedReserveState = reserveInitialState(run.makeEmpty());
+  const expectedReserveState = reserveInitialState(run.makeEmpty());
   await assertReserveState(reserveTracker, 'initial', expectedReserveState);
 
   await E(reserveCreatorFacet).addIssuer(aeth.issuer, 'Aeth');
