@@ -248,8 +248,10 @@ export const allValues = async obj => {
  */
 export const allValuesSettled = async obj => {
   const resolved = await Promise.allSettled(values(obj));
+  // @ts-expect-error
+  const valuesMapped = resolved.map(({ value }) => value);
   // @ts-expect-error cast
-  return harden(fromEntries(zip(keys(obj), resolved)));
+  return harden(fromEntries(zip(keys(obj), valuesMapped)));
 };
 
 /**

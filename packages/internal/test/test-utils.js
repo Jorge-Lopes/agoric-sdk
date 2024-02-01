@@ -268,23 +268,14 @@ test('synchronizedTee - consume synchronized', async t => {
 
 test('allValuesSettled', async t => {
   const result = await allValuesSettled({
-    promiseOne: Promise.resolve('I am a happy promise'),
+    promiseOne: Promise.resolve('I am a happy promise - One'),
     promiseTwo: Promise.reject(new Error('I am an upset promise')),
-    promiseThree: Promise.resolve('I am a happy promise'),
+    promiseThree: Promise.resolve('I am a happy promise - Three'),
   });
 
-  t.deepEqual(result.promiseOne, {
-    status: 'fulfilled',
-    value: 'I am a happy promise',
-  });
-
-  t.deepEqual(result.promiseTwo, {
-    status: 'rejected',
-    reason: new Error('I am an upset promise'),
-  });
-
-  t.deepEqual(result.promiseThree, {
-    status: 'fulfilled',
-    value: 'I am a happy promise',
+  t.deepEqual(result, {
+    promiseOne: 'I am a happy promise - One',
+    promiseTwo: undefined,
+    promiseThree: 'I am a happy promise - Three',
   });
 });
