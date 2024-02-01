@@ -29,6 +29,13 @@ import { makeHeapZone } from '@agoric/base-zone/heap.js';
 import { assertPathSegment } from '@agoric/internal/src/lib-chainStorage.js';
 import * as cb from '@agoric/internal/src/callback.js';
 
+let blockMakeChildNode = '';
+
+export const setBlockMakeChildNode = nodeName => {
+  blockMakeChildNode = nodeName;
+  return `LOG: blockMakeChildNode set to node ${nodeName}`;
+};
+
 /**
  * This represents a node in an IAVL tree.
  *
@@ -142,8 +149,8 @@ const prepareChainStorageNode = zone => {
       },
 
       makeChildNode(name, childNodeOptions = {}) {
-        if (name === '3600') {
-          console.log('Log: MOCK makeChildNode ... REJECT :');
+        if (blockMakeChildNode === name) {
+          console.log(`Log: MOCK makeChildNode REJECTED for node ${name}`);
           return Promise.reject();
         }
 
