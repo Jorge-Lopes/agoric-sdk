@@ -241,7 +241,8 @@ export const allValues = async obj => {
 };
 
 /**
- * Just like allValues above but doesn't throw when one of the promises reject.
+ * Just like allValues above but use this when you want to silently handle rejected promises
+ * and still keep using the values of resolved ones.
  *
  * @type
  * { <T extends Record<string, ERef<any>>>(obj: T) => Promise<{ [K in keyof T]: Awaited<T[K]>}> }
