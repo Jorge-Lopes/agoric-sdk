@@ -3,7 +3,10 @@ import { makeIssuerKit } from '@agoric/ertp';
 import { unsafeMakeBundleCache } from '@agoric/swingset-vat/tools/bundleTool.js';
 import { allValues, makeTracer, objectMap } from '@agoric/internal';
 import { buildManualTimer } from '@agoric/swingset-vat/tools/manual-timer.js';
-import { makeRatioFromAmounts } from '@agoric/zoe/src/contractSupport/index.js';
+import {
+  makeRatio,
+  makeRatioFromAmounts,
+} from '@agoric/zoe/src/contractSupport/index.js';
 import { eventLoopIteration } from '@agoric/internal/src/testing-utils.js';
 import { TimeMath } from '@agoric/time';
 import { subscribeEach } from '@agoric/notifier';
@@ -94,6 +97,7 @@ export const setupServices = async (
     zoe,
     run,
     aeth,
+    abtc,
     interestTiming,
     minInitialDebt,
     referencedUi,
@@ -102,17 +106,28 @@ export const setupServices = async (
 
   t.context.timer = timer;
 
-  const { space, priceAuthorityAdmin, aethTestPriceAuthority } =
-    await setupElectorateReserveAndAuction(
-      t,
-      // @ts-expect-error inconsistent types with withAmountUtils
-      run,
-      aeth,
-      priceOrList,
-      quoteInterval,
-      unitAmountIn,
-      auctionParams,
-    );
+  const btcKit = {
+    btc: abtc,
+    btcPrice: makeRatio(50n, run.brand, 10n, abtc.brand),
+    btcAmountIn: abtc.make(400n),
+  };
+
+  const {
+    space,
+    priceAuthorityAdmin,
+    aethTestPriceAuthority,
+    abtcTestPriceAuthority,
+  } = await setupElectorateReserveAndAuction(
+    t,
+    // @ts-expect-error inconsistent types with withAmountUtils
+    run,
+    aeth,
+    priceOrList,
+    quoteInterval,
+    unitAmountIn,
+    btcKit,
+    auctionParams,
+  );
 
   const {
     consume,
@@ -143,6 +158,14 @@ export const setupServices = async (
     rates,
   );
 
+  await eventLoopIteration()
+
+  const abtcVaultManagerP = E(vaultFactoryCreatorFacetP).addVaultType(
+    abtc.issuer,
+    'ABtc',
+    rates,
+  );
+
   /** @typedef {import('../../src/proposals/econ-behaviors.js').AuctioneerKit} AuctioneerKit */
   /** @typedef {import('@agoric/zoe/tools/manualPriceAuthority.js').ManualPriceAuthority} ManualPriceAuthority */
   /** @typedef {import('../../src/vaultFactory/vaultFactory.js').VaultFactoryContract} VFC */
@@ -152,8 +175,10 @@ export const setupServices = async (
    *   VaultFactoryCreatorFacet,
    *   VFC['publicFacet'],
    *   VaultManager,
+   *   VaultManager,
    *   AuctioneerKit,
    *   ManualPriceAuthority,
+   *   CollateralManager,
    *   CollateralManager,
    *   chainStorage,
    *   board,
@@ -164,9 +189,11 @@ export const setupServices = async (
     vaultFactory, // creator
     vfPublic,
     aethVaultManager,
+    abtcVaultManager,
     auctioneerKit,
     priceAuthority,
     aethCollateralManager,
+    abtcCollateralManager,
     chainStorage,
     board,
   ] = await Promise.all([
@@ -174,9 +201,11 @@ export const setupServices = async (
     vaultFactoryCreatorFacetP,
     E.get(consume.vaultFactoryKit).publicFacet,
     aethVaultManagerP,
+    abtcVaultManagerP,
     consume.auctioneerKit,
     /** @type {Promise<ManualPriceAuthority>} */ (consume.priceAuthority),
     E(aethVaultManagerP).getPublicFacet(),
+    E(abtcVaultManagerP).getPublicFacet(),
     consume.chainStorage,
     consume.board,
   ]);
@@ -198,10 +227,13 @@ export const setupServices = async (
       vfPublic,
       aethVaultManager,
       aethCollateralManager,
+      abtcVaultManager,
+      abtcCollateralManager,
     },
   };
 
   await E(auctioneerKit.creatorFacet).addBrand(aeth.issuer, 'Aeth');
+  await E(auctioneerKit.creatorFacet).addBrand(abtc.issuer, 'Abtc');
 
   return {
     zoe,
@@ -215,6 +247,7 @@ export const setupServices = async (
     auctioneerKit,
     priceAuthorityAdmin,
     aethTestPriceAuthority,
+    abtcTestPriceAuthority,
     chainStorage,
     board,
   };

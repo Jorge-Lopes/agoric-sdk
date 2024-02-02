@@ -65,6 +65,11 @@ export const defaultParamValues = debtBrand =>
  * @param {NatValue[] | Ratio} priceOrList
  * @param {RelativeTime} quoteInterval
  * @param {Amount | undefined} unitAmountIn
+ * @param {{
+ *   btc: any;
+ *   btcPrice: Ratio;
+ *   btcAmountIn: any;
+ * }} btcKit
  * @param {Partial<import('../../src/auction/params.js').AuctionParams>} actionParamArgs
  */
 export const setupElectorateReserveAndAuction = async (
@@ -74,6 +79,7 @@ export const setupElectorateReserveAndAuction = async (
   priceOrList,
   quoteInterval,
   unitAmountIn,
+  btcKit,
   {
     StartFrequency = SECONDS_PER_WEEK,
     DiscountStep = 2000n,
@@ -121,12 +127,37 @@ export const setupElectorateReserveAndAuction = async (
         timer,
         quoteIssuerKit,
       });
+
+  const abtcTestPriceAuthority = Array.isArray(btcKit.btcPrice)
+    ? makeScriptedPriceAuthority({
+        actualBrandIn: btcKit.btc.brand,
+        actualBrandOut: run.brand,
+        priceList: btcKit.btcPrice,
+        timer,
+        quoteMint: quoteIssuerKit.mint,
+        unitAmountIn: btcKit.btcAmountIn,
+        quoteInterval,
+      })
+    : makeManualPriceAuthority({
+        actualBrandIn: btcKit.btc.brand,
+        actualBrandOut: run.brand,
+        initialPrice: btcKit.btcPrice,
+        timer,
+        quoteIssuerKit,
+      });
+
   const baggage = makeScalarBigMapStore('baggage');
   const { priceAuthority: priceAuthorityReg, adminFacet: priceAuthorityAdmin } =
     providePriceAuthorityRegistry(baggage);
   await E(priceAuthorityAdmin).registerPriceAuthority(
     aethTestPriceAuthority,
     aeth.brand,
+    run.brand,
+  );
+
+  await E(priceAuthorityAdmin).registerPriceAuthority(
+    abtcTestPriceAuthority,
+    btcKit.btc.brand,
     run.brand,
   );
 
@@ -148,6 +179,7 @@ export const setupElectorateReserveAndAuction = async (
     priceAuthority: priceAuthorityReg,
     priceAuthorityAdmin,
     aethTestPriceAuthority,
+    abtcTestPriceAuthority,
   };
 };
 
