@@ -331,8 +331,6 @@ test('liq-flow-2a', async t => {
     lockedQuote: null,
   });
 
-  // ALICE's loan ////////////////////////////////////////////
-
   // Create a loan for Alice for 5000 Minted with 1000 aeth collateral
   // ratio is 4:1
   const aliceCollateralAmount = aeth.make(1000n);
@@ -360,8 +358,7 @@ test('liq-flow-2a', async t => {
     totalDebt: { value: 5250n },
   });
 
-  // reduce collateral  /////////////////////////////////////
-
+  // reduce collateral
   trace(t, 'alice reduce collateral');
 
   // Alice reduce collateral by 300. That leaves her at 700 * 10 > 1.05 * 5000.
@@ -385,7 +382,6 @@ test('liq-flow-2a', async t => {
     totalCollateral: { value: 700n },
   });
 
-  // TODO: UNCOMMENT THIS WHEN SOURCE IS READY
   await assertLiqNodeForAuctionCreated({
     t,
     rootNode: chainStorage,
@@ -397,7 +393,7 @@ test('liq-flow-2a', async t => {
   );
   trace(t, 'changed price to 7 RUN/Aeth');
 
-  // A BIDDER places a BID //////////////////////////
+  // A bidder places a bid
   const bidAmount = run.make(3300n);
   const desired = aeth.make(700n);
   const bidderSeat = await bid(t, zoe, auctioneerKit, aeth, bidAmount, desired);
@@ -420,7 +416,7 @@ test('liq-flow-2a', async t => {
   // expect Alice to be liquidated because her collateral is too low.
   await assertVaultState(t, aliceNotifier, Phase.LIQUIDATING);
 
-  // TODO: Check vaults.preAuction here
+  // Check vaults.preAuction here
   await assertStorageData({
     t,
     storageRoot: chainStorage,
@@ -468,7 +464,7 @@ test('liq-flow-2a', async t => {
   //  Bidder bought 800 Aeth
   await assertBidderPayout(t, bidderSeat, run, 115n, aeth, 700n);
 
-  // TODO: Check vaults.postAuction and auctionResults here
+  // Check vaults.postAuction and auctionResults here
   await assertStorageData({
     t,
     storageRoot: chainStorage,
@@ -476,7 +472,6 @@ test('liq-flow-2a', async t => {
     expected: [],
   });
 
-  // FIXME: https://github.com/Jorge-Lopes/agoric-sdk-liquidation-visibility/issues/3#issuecomment-1905488335
   await assertStorageData({
     t,
     storageRoot: chainStorage,
@@ -493,7 +488,6 @@ test('liq-flow-2a', async t => {
     },
   });
 
-  // TODO: Snapshot here
   await documentStorageSchema(t, chainStorage, {
     note: 'Scenario 2 Liquidation Visibility Snapshot',
     node: `vaultFactory.managers.manager0.liquidations.${now1.absValue.toString()}`,
@@ -558,9 +552,7 @@ test('liq-flow-2b', async t => {
     lockedQuote: null,
   });
 
-  // ALICE takes out a loan ////////////////////////
-
-  // a loan of 95 with 5% fee produces a debt of 100.
+  // Create a loan for Alice of 95 with 5% fee produces a debt of 100.
   const aliceCollateralAmount = aeth.make(15n);
   const aliceWantMinted = run.make(95n);
   /** @type {UserSeat<VaultKit>} */
@@ -588,7 +580,7 @@ test('liq-flow-2b', async t => {
     totalCollateral: { value: 15n },
   });
 
-  // BOB takes out a loan ////////////////////////
+  // BOB takes out a loan
   const bobCollateralAmount = aeth.make(48n);
   const bobWantMinted = run.make(150n);
   /** @type {UserSeat<VaultKit>} */
@@ -616,7 +608,7 @@ test('liq-flow-2b', async t => {
     totalCollateral: { value: 63n },
   });
 
-  // A BIDDER places a BID //////////////////////////
+  // A bidder places a bid
   const bidAmount = run.make(100n);
   const desired = aeth.make(8n);
   const bidderSeat = await bid(t, zoe, auctioneerKit, aeth, bidAmount, desired);
@@ -627,7 +619,7 @@ test('liq-flow-2b', async t => {
   );
   await eventLoopIteration();
 
-  // TODO: assert node not created
+  // Assert node not created
   await assertLiqNodeForAuctionCreated({
     t,
     rootNode: chainStorage,
@@ -642,7 +634,7 @@ test('liq-flow-2b', async t => {
   await assertVaultState(t, aliceNotifier, Phase.LIQUIDATING);
   await assertVaultState(t, bobNotifier, Phase.LIQUIDATING);
 
-  // TODO: PreAuction Here
+  // Check vaults.preAuction here
   await assertStorageData({
     t,
     storageRoot: chainStorage,
@@ -731,7 +723,7 @@ test('liq-flow-2b', async t => {
     },
   });
 
-  // TODO: PostAuction here
+  // Check vaults.postAuction and auctionResults here
   await assertStorageData({
     t,
     storageRoot: chainStorage,
@@ -747,7 +739,6 @@ test('liq-flow-2b', async t => {
     ],
   });
 
-  // TODO: AuctionResults here
   await assertStorageData({
     t,
     storageRoot: chainStorage,
@@ -764,7 +755,6 @@ test('liq-flow-2b', async t => {
     },
   });
 
-  // TODO: Snapshot here
   await documentStorageSchema(t, chainStorage, {
     note: 'Scenario 3 Liquidation Visibility Snapshot',
     node: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}`,
@@ -1040,12 +1030,18 @@ test('liq-rejected-timestampStorageNode', async t => {
   );
 
   const {
-    vaultFactory: { aethCollateralManager },
+    vaultFactory: { vaultFactory, aethCollateralManager },
     aethTestPriceAuthority,
-    reserveKit: { reserveCreatorFacet },
+    reserveKit: { reserveCreatorFacet, reservePublicFacet },
     auctioneerKit,
     chainStorage,
   } = services;
+
+  const { reserveTracker } = await getMetricTrackers({
+    t,
+    collateralManager: aethCollateralManager,
+    reservePublicFacet,
+  });
 
   await E(reserveCreatorFacet).addIssuer(aeth.issuer, 'Aeth');
 
@@ -1063,9 +1059,12 @@ test('liq-rejected-timestampStorageNode', async t => {
   // A bidder places a bid
   const bidAmount = run.make(2000n);
   const desired = aeth.make(400n);
-  await bid(t, zoe, auctioneerKit, aeth, bidAmount, desired);
+  const bidderSeat = await bid(t, zoe, auctioneerKit, aeth, bidAmount, desired);
 
-  await legacyOfferResult(vaultSeat);
+  const {
+    vault,
+    publicNotifiers: { vault: vaultNotifier },
+  } = await legacyOfferResult(vaultSeat);
 
   // Check that no child node with auction start time's name created before the liquidation
   const vstorageBeforeLiquidation = await getDataFromVstorage(
@@ -1079,12 +1078,39 @@ test('liq-rejected-timestampStorageNode', async t => {
   // drop collateral price from 5:1 to 4:1 and liquidate vault
   aethTestPriceAuthority.setPrice(makeRatio(40n, run.brand, 10n, aeth.brand));
 
-  await startAuctionClock(auctioneerKit, manualTimer);
+  const { startTime } = await startAuctionClock(auctioneerKit, manualTimer);
 
-  // Check that {timestamp}.vaults.preAuction values are correct before auction is completed
+  // Check that no child node with auction start time's name created after the liquidation
   const vstorageDuringLiquidation = await getDataFromVstorage(
     chainStorage,
     `vaultFactory.managers.manager0.liquidations`,
   );
   t.is(vstorageDuringLiquidation.length, 0);
+
+  await assertVaultState(t, vaultNotifier, 'liquidating');
+  await assertVaultCollateral(t, vault, 0n);
+  await assertVaultCurrentDebt(t, vault, wantMinted);
+
+  const currentTime = await setClockAndAdvanceNTimes(manualTimer, 2, startTime, 2n);
+  trace(`advanced time to `, currentTime);
+
+  await assertVaultState(t, vaultNotifier, 'liquidated');
+  await assertVaultSeatExited(t, vaultSeat);
+  await assertVaultLocked(t, vaultNotifier, 0n);
+  await assertVaultCurrentDebt(t, vault, 0n);
+  await assertVaultFactoryRewardAllocation(t, vaultFactory, 80n);
+
+  const closeSeat = await closeVault({ t, vault });
+  await E(closeSeat).getOfferResult();
+
+  await assertCollateralProceeds(t, closeSeat, aeth.makeEmpty());
+  await assertVaultCollateral(t, vault, 0n);
+  await assertBidderPayout(t, bidderSeat, run, 320n, aeth, 400n);
+
+  await assertReserveState(reserveTracker, 'like', {
+    allocations: {
+      Aeth: undefined,
+      Fee: undefined,
+    },
+  });
 });
