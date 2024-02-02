@@ -53,6 +53,9 @@ import {
   assertVaultNotification,
 } from './assertions.js';
 import { Phase } from '../vaultFactory/driver.js';
+import { makeScriptedPriceAuthority } from '@agoric/zoe/tools/scriptedPriceAuthority.js';
+import { makeScalarBigMapStore } from '@agoric/vat-data';
+import { providePriceAuthorityRegistry } from '@agoric/vats/src/priceAuthorityRegistry.js';
 
 const trace = makeTracer('TestLiquidationVisibility', false);
 
@@ -62,7 +65,7 @@ test.before(async t => {
   const { zoe, feeMintAccessP } = await setUpZoeForTest();
   const feeMintAccess = await feeMintAccessP;
 
-  const { run, aeth, bundleCache, bundles, installation } =
+  const { run, aeth, abtc, bundleCache, bundles, installation } =
     await setupBasics(zoe);
 
   const contextPs = {
@@ -85,6 +88,7 @@ test.before(async t => {
     ...frozenCtx,
     bundleCache,
     aeth,
+    abtc,
     run,
   };
 
@@ -264,6 +268,137 @@ test('liq-result-scenario-1', async t => {
     note: 'Scenario 1 Liquidation Visibility Snapshot',
     node: `vaultFactory.managers.manager0.liquidations.${time.absValue.toString()}`,
   });
+
+});
+
+// assert that vaultId being recorded under liquidations correspond to the correct vaultId under vaults
+// test flow with more than one vaultManager
+//  - same collateral
+//  + different collateral
+test('liq-result-scenario-1.1', async t => {
+  const { zoe, run, aeth, abtc, rates } = t.context;
+  const manualTimer = buildManualTimer();
+
+  const services = await setupServices(
+    t,
+    makeRatio(50n, run.brand, 10n, aeth.brand),
+    aeth.make(400n),
+    manualTimer,
+    undefined,
+    { StartFrequency: ONE_HOUR },
+  );
+
+  // register in the agoricNames (look for example in the liquidation bot, test env)
+  // then create price authority 
+
+  // 1. Create new asset, other than Aeth
+  // 2. Get the vaultFactory
+  // 3. Execute the addVaultType
+  // 4. Get the vaultManager
+
+  const {
+    vaultFactory: { vaultFactory, aethCollateralManager },
+    aethTestPriceAuthority,
+    reserveKit: { reserveCreatorFacet, reservePublicFacet },
+    auctioneerKit,
+    chainStorage,
+    priceAuthorityAdmin
+  } = services;
+
+  // const baggage = makeScalarBigMapStore('baggage');
+  // const { priceAuthority: priceAuthorityReg, adminFacet: priceAuthorityAdmin } =
+  //   providePriceAuthorityRegistry(baggage);
+  const abtcTestPriceAuthority = makeScriptedPriceAuthority({
+    actualBrandIn: abtc.brand,
+    actualBrandOut: run.brand,
+    priceList: makeRatio(50n, run.brand, 10n, abtc.brand),
+    manualTimer,
+  })
+  await E(priceAuthorityAdmin).registerPriceAuthority(
+    abtcTestPriceAuthority,
+    abtc.brand,
+    run.brand,
+  );
+
+  await E(auctioneerKit.creatorFacet).addBrand(abtc.issuer, 'Abtc');
+
+  const { reserveTracker } = await getMetricTrackers({
+    t,
+    collateralManager: aethCollateralManager,
+    reservePublicFacet,
+  });
+
+  let expectedReserveState = reserveInitialState(run.makeEmpty());
+  await assertReserveState(reserveTracker, 'initial', expectedReserveState);
+
+  const abtcVaultManager = await E(vaultFactory).addVaultType(
+    abtc.issuer,
+    'ABtc',
+    rates,
+  );
+  const abtcCollateralManager = await E(abtcVaultManager).getPublicFacet();
+
+  await E(reserveCreatorFacet).addIssuer(aeth.issuer, 'Aeth');
+  await E(reserveCreatorFacet).addIssuer(abtc.issuer, 'Abtc');
+
+  const vstorageBeforeLiquidation = await getDataFromVstorage(
+    chainStorage,
+    `vaultFactory.managers`,
+  );
+
+  const collateralAmountAeth = aeth.make(400n);
+  const collateralAmountAbtc = abtc.make(400n);
+  const wantMinted = run.make(1600n);
+
+  const vaultSeatAeth = await openVault({
+    t,
+    cm: aethCollateralManager,
+    collateralAmount: collateralAmountAeth,
+    colKeyword: 'aeth',
+    wantMintedAmount: wantMinted,
+  });
+
+  const vaultSeatAbtc = await openVault({
+    t,
+    cm: abtcCollateralManager,
+    collateralAmount: collateralAmountAbtc,
+    colKeyword: 'abtc',
+    wantMintedAmount: wantMinted,
+  });
+
+  // A bidder places a bid
+  const bidAmountAeth = run.make(2000n);
+  const bidAmountAbtc = run.make(2000n);
+  const desiredAeth = aeth.make(400n);
+  const desiredAbtc = abtc.make(400n);
+  const bidderSeatAeth = await bid(t, zoe, auctioneerKit, aeth, bidAmountAeth, desiredAeth);
+  const bidderSeatAbtc = await bid(t, zoe, auctioneerKit, abtc, bidAmountAbtc, desiredAbtc);
+
+  const {
+    vaultAeth,
+    publicNotifiers: { vault: vaultNotifierAeth },
+  } = await legacyOfferResult(vaultSeatAeth);
+  const {
+    vaultAbtc,
+    publicNotifiers: { vault: vaultNotifierAbtc },
+  } = await legacyOfferResult(vaultSeatAbtc);
+
+  // aeth
+  await assertVaultCurrentDebt(t, vaultAeth, wantMinted);
+  await assertVaultState(t, vaultNotifierAeth, 'active');
+  await assertVaultDebtSnapshot(t, vaultNotifierAeth, wantMinted);
+  await assertMintedAmount(t, vaultSeatAeth, wantMinted);
+  await assertVaultCollateral(t, vaultAeth, 400n);
+
+  // abtc
+  await assertVaultCurrentDebt(t, vaultAbtc, wantMinted);
+  await assertVaultState(t, vaultNotifierAbtc, 'active');
+  await assertVaultDebtSnapshot(t, vaultNotifierAbtc, wantMinted);
+  await assertMintedAmount(t, vaultSeatAbtc, wantMinted);
+  await assertVaultCollateral(t, vaultAbtc, 400n);
+
+  t.is(true, true);
+  // same logic
 });
 
 // We'll make a loan, and trigger liquidation via price changes. The interest

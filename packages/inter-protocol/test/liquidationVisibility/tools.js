@@ -34,6 +34,9 @@ export const setupBasics = async zoe => {
   const aeth = withAmountUtils(
     makeIssuerKit('aEth', 'nat', { decimalPlaces: 6 }),
   );
+  const abtc = withAmountUtils(
+    makeIssuerKit('aBtc', 'nat', { decimalPlaces: 6 }),
+  );
 
   const bundleCache = await unsafeMakeBundleCache('./bundles/');
   const bundles = await allValues({
@@ -47,6 +50,7 @@ export const setupBasics = async zoe => {
   return {
     run,
     aeth,
+    abtc,
     bundleCache,
     bundles,
     installation,
