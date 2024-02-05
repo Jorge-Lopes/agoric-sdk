@@ -1,3 +1,4 @@
+/* eslint-disable import/no-extraneous-dependencies */
 import { E } from '@endo/eventual-send';
 import { M } from '@endo/patterns';
 import { makeIssuerKit, AssetKind } from '@agoric/ertp';
