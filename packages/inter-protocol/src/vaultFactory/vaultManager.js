@@ -26,7 +26,7 @@ import {
   NotifierShape,
   RatioShape,
 } from '@agoric/ertp';
-import { allValuesSettled, makeTracer } from "@agoric/internal";
+import { allValuesSettled, makeTracer } from '@agoric/internal';
 import { makeStoredNotifier, observeNotifier } from '@agoric/notifier';
 import { appendToStoredArray } from '@agoric/store/src/stores/store-utils.js';
 import {

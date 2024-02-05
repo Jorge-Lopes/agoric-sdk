@@ -1091,7 +1091,12 @@ test('liq-rejected-timestampStorageNode', async t => {
   await assertVaultCollateral(t, vault, 0n);
   await assertVaultCurrentDebt(t, vault, wantMinted);
 
-  const currentTime = await setClockAndAdvanceNTimes(manualTimer, 2, startTime, 2n);
+  const currentTime = await setClockAndAdvanceNTimes(
+    manualTimer,
+    2,
+    startTime,
+    2n,
+  );
   trace(`advanced time to `, currentTime);
 
   await assertVaultState(t, vaultNotifier, 'liquidated');
