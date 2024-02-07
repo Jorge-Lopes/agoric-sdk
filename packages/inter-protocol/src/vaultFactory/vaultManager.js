@@ -1410,8 +1410,10 @@ export const prepareVaultManagerKit = (
           );
 
           trace(`LiqV after long wait`, proceeds);
+          let plan;
+          let vaultsInPlan;
           try {
-            const { plan, vaultsInPlan } = helper.planProceedsDistribution(
+            ({ plan, vaultsInPlan } = helper.planProceedsDistribution(
               proceeds,
               totalDebt,
               // If a quote was available at the start of liquidation, but is no
@@ -1420,7 +1422,7 @@ export const prepareVaultManagerKit = (
               storedCollateralQuote || collateralQuoteBefore,
               vaultData,
               totalCollateral,
-            );
+            ));
             trace('PLAN', plan);
             // distributeProceeds may reconstitute vaults, removing them from liquidatingVaults
             helper.distributeProceeds({
@@ -1430,28 +1432,6 @@ export const prepareVaultManagerKit = (
               totalDebt,
               vaultsInPlan,
             });
-
-            void helper.writeLiqVisibility(
-              liquidationVisibilityWriters,
-              harden([
-                [
-                  'writeAuctionResults',
-                  {
-                    plan,
-                    totalCollateral,
-                    totalDebt,
-                    auctionSchedule,
-                  },
-                ],
-                [
-                  'writePostAuction',
-                  {
-                    plan,
-                    vaultsInPlan,
-                  },
-                ],
-              ]),
-            );
           } catch (err) {
             console.error('🚨 Error distributing proceeds:', err);
           }
@@ -1462,7 +1442,27 @@ export const prepareVaultManagerKit = (
             vault.liquidated();
             liquidatingVaults.delete(vault);
           }
-
+          void helper.writeLiqVisibility(
+            liquidationVisibilityWriters,
+            harden([
+              [
+                'writeAuctionResults',
+                {
+                  plan,
+                  totalCollateral,
+                  totalDebt,
+                  auctionSchedule,
+                },
+              ],
+              [
+                'writePostAuction',
+                {
+                  plan,
+                  vaultsInPlan,
+                },
+              ],
+            ]),
+          );
           void helper.writeMetrics();
         },
       },
