@@ -66,10 +66,8 @@ test.before(async t => {
     auctioneer: './test/liquidationVisibility/auctioneer-contract-wrapper.js',
   };
 
-  const { run, aeth, abtc, bundleCache, bundles, installation } = await setupBasics(
-    zoe,
-    contractsWrapper,
-  );
+  const { run, aeth, abtc, bundleCache, bundles, installation } =
+    await setupBasics(zoe, contractsWrapper);
 
   const contextPs = {
     zoe,
@@ -272,14 +270,13 @@ test('liq-flow-1.1', async t => {
     manualTimer,
     undefined,
     { StartFrequency: ONE_HOUR },
-    true
+    true,
   );
 
   const {
     vaultFactory: {
       vaultFactory,
       aethCollateralManager,
-      abtcVaultManager,
       abtcCollateralManager,
     },
     aethTestPriceAuthority,
@@ -296,7 +293,11 @@ test('liq-flow-1.1', async t => {
   });
 
   let expectedReserveStateAeth = reserveInitialState(run.makeEmpty());
-  await assertReserveState(reserveTrackerAeth, 'initial', expectedReserveStateAeth);
+  await assertReserveState(
+    reserveTrackerAeth,
+    'initial',
+    expectedReserveStateAeth,
+  );
 
   const { reserveTracker: reserveTrackerAbtc } = await getMetricTrackers({
     t,
@@ -305,7 +306,11 @@ test('liq-flow-1.1', async t => {
   });
 
   let expectedReserveStateAbtc = reserveInitialState(run.makeEmpty());
-  await assertReserveState(reserveTrackerAbtc, 'initial', expectedReserveStateAbtc);
+  await assertReserveState(
+    reserveTrackerAbtc,
+    'initial',
+    expectedReserveStateAbtc,
+  );
 
   await E(reserveCreatorFacet).addIssuer(aeth.issuer, 'Aeth');
   await E(reserveCreatorFacet).addIssuer(abtc.issuer, 'Abtc');
@@ -333,8 +338,22 @@ test('liq-flow-1.1', async t => {
   const bidAmount = run.make(2000n);
   const desiredAeth = aeth.make(400n);
   const desiredAbtc = abtc.make(400n);
-  const bidderSeatAeth = await bid(t, zoe, auctioneerKit, aeth, bidAmount, desiredAeth);
-  const bidderSeatAbtc = await bid(t, zoe, auctioneerKit, abtc, bidAmount, desiredAbtc);
+  const bidderSeatAeth = await bid(
+    t,
+    zoe,
+    auctioneerKit,
+    aeth,
+    bidAmount,
+    desiredAeth,
+  );
+  const bidderSeatAbtc = await bid(
+    t,
+    zoe,
+    auctioneerKit,
+    abtc,
+    bidAmount,
+    desiredAbtc,
+  );
 
   const {
     vault: vaultAeth,
@@ -457,12 +476,22 @@ test('liq-flow-1.1', async t => {
   await E(closeSeatAbtc).getOfferResult();
 
   // aeth
-  await assertCollateralProceeds(t, closeSeatAeth, aeth.makeEmpty(), aeth.issuer);
+  await assertCollateralProceeds(
+    t,
+    closeSeatAeth,
+    aeth.makeEmpty(),
+    aeth.issuer,
+  );
   await assertVaultCollateral(t, vaultAeth, 0n, aeth);
   await assertBidderPayout(t, bidderSeatAeth, run, 320n, aeth, 400n);
 
   // abtc
-  await assertCollateralProceeds(t, closeSeatAbtc, abtc.makeEmpty(), abtc.issuer);
+  await assertCollateralProceeds(
+    t,
+    closeSeatAbtc,
+    abtc.makeEmpty(),
+    abtc.issuer,
+  );
   await assertVaultCollateral(t, vaultAbtc, 0n, abtc);
   await assertBidderPayout(t, bidderSeatAbtc, run, 320n, abtc, 400n);
 
@@ -472,7 +501,11 @@ test('liq-flow-1.1', async t => {
       Fee: undefined,
     },
   };
-  await assertReserveState(reserveTrackerAeth, 'like', expectedReserveStateAeth);
+  await assertReserveState(
+    reserveTrackerAeth,
+    'like',
+    expectedReserveStateAeth,
+  );
 
   expectedReserveStateAbtc = {
     allocations: {
@@ -480,7 +513,11 @@ test('liq-flow-1.1', async t => {
       Fee: undefined,
     },
   };
-  await assertReserveState(reserveTrackerAbtc, 'like', expectedReserveStateAbtc);
+  await assertReserveState(
+    reserveTrackerAbtc,
+    'like',
+    expectedReserveStateAbtc,
+  );
 
   // Check that {timestamp}.vaults.postAuction values are correct after auction is completed
   await assertStorageData({
@@ -569,7 +606,7 @@ test('liq-flow-1.1', async t => {
     note: 'Scenario 1.1 Liquidation Visibility Snapshot [Abtc]',
     node: `vaultFactory.managers.manager1.liquidations.${time.absValue.toString()}`,
   });
-})
+});
 
 /* Test liquidation flow 2a:
  * Auction does not raise enough to cover IST debt;
@@ -687,7 +724,12 @@ test('liq-flow-2a', async t => {
   await E(aliceReduceCollateralSeat).getOfferResult();
 
   trace('alice ');
-  await assertCollateralProceeds(t, aliceReduceCollateralSeat, aeth.make(300n), aeth.issuer);
+  await assertCollateralProceeds(
+    t,
+    aliceReduceCollateralSeat,
+    aeth.make(300n),
+    aeth.issuer,
+  );
 
   await assertVaultDebtSnapshot(t, aliceNotifier, aliceWantMinted);
   trace(t, 'alice reduce collateral');

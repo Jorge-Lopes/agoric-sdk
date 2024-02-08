@@ -68,7 +68,12 @@ export const assertVaultCurrentDebt = async (t, vault, debt) => {
   );
 };
 
-export const assertVaultCollateral = async (t, vault, collateralValue, asset) => {
+export const assertVaultCollateral = async (
+  t,
+  vault,
+  collateralValue,
+  asset,
+) => {
   const collateralAmount = await E(vault).getCollateralAmount();
 
   t.deepEqual(collateralAmount, asset.make(collateralValue));
@@ -94,7 +99,12 @@ export const assertMintedProceeds = async (t, vaultSeat, wantMinted) => {
   );
 };
 
-export const assertVaultLocked = async (t, vaultNotifier, lockedValue, asset) => {
+export const assertVaultLocked = async (
+  t,
+  vaultNotifier,
+  lockedValue,
+  asset,
+) => {
   const notification = await E(vaultNotifier).getUpdateSince();
   const lockedAmount = notification.value.locked;
 

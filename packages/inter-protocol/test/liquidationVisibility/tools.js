@@ -3,7 +3,10 @@ import { makeIssuerKit } from '@agoric/ertp';
 import { unsafeMakeBundleCache } from '@agoric/swingset-vat/tools/bundleTool.js';
 import { allValues, makeTracer, objectMap } from '@agoric/internal';
 import { buildManualTimer } from '@agoric/swingset-vat/tools/manual-timer.js';
-import { makeRatio, makeRatioFromAmounts } from '@agoric/zoe/src/contractSupport/index.js';
+import {
+  makeRatio,
+  makeRatioFromAmounts,
+} from '@agoric/zoe/src/contractSupport/index.js';
 import { eventLoopIteration } from '@agoric/internal/src/testing-utils.js';
 import { TimeMath } from '@agoric/time';
 import { subscribeEach } from '@agoric/notifier';
@@ -85,6 +88,7 @@ export const setupBasics = async (zoe, contractsWrapper) => {
  * @param {import('@agoric/time').TimerService} timer
  * @param {RelativeTime} quoteInterval
  * @param {Partial<import('../../src/auction/params.js').AuctionParams>} [auctionParams]
+ * @param setupExtraAsset
  */
 export const setupServices = async (
   t,
@@ -108,29 +112,30 @@ export const setupServices = async (
 
   t.context.timer = timer;
 
-  const btcKit = setupExtraAsset ? {
-    btc: abtc,
-    btcPrice: makeRatio(50n, run.brand, 10n, abtc.brand),
-    btcAmountIn: abtc.make(400n),
-  } : undefined;
+  const btcKit = setupExtraAsset
+    ? {
+        btc: abtc,
+        btcPrice: makeRatio(50n, run.brand, 10n, abtc.brand),
+        btcAmountIn: abtc.make(400n),
+      }
+    : undefined;
 
   const {
     space,
     priceAuthorityAdmin,
     aethTestPriceAuthority,
     abtcTestPriceAuthority,
-  } =
-    await setupElectorateReserveAndAuction(
-      t,
-      // @ts-expect-error inconsistent types with withAmountUtils
-      run,
-      aeth,
-      priceOrList,
-      quoteInterval,
-      unitAmountIn,
-      auctionParams,
-      btcKit,
-    );
+  } = await setupElectorateReserveAndAuction(
+    t,
+    // @ts-expect-error inconsistent types with withAmountUtils
+    run,
+    aeth,
+    priceOrList,
+    quoteInterval,
+    unitAmountIn,
+    auctionParams,
+    btcKit,
+  );
 
   const {
     consume,
@@ -161,7 +166,7 @@ export const setupServices = async (
     rates,
   );
 
-  let abtcVaultManagerP = undefined;
+  let abtcVaultManagerP;
   if (setupExtraAsset) {
     await eventLoopIteration();
     abtcVaultManagerP = E(vaultFactoryCreatorFacetP).addVaultType(
@@ -210,7 +215,9 @@ export const setupServices = async (
     consume.auctioneerKit,
     /** @type {Promise<ManualPriceAuthority>} */ (consume.priceAuthority),
     E(aethVaultManagerP).getPublicFacet(),
-    abtcVaultManagerP ? E(abtcVaultManagerP).getPublicFacet() : Promise.resolve(undefined),
+    abtcVaultManagerP
+      ? E(abtcVaultManagerP).getPublicFacet()
+      : Promise.resolve(undefined),
     consume.chainStorage,
     consume.board,
   ]);
