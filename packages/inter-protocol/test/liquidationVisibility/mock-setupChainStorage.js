@@ -444,6 +444,11 @@ const setupBootstrap = async (t, optTimer) => {
  * @param {RelativeTime} quoteInterval
  * @param {Amount | undefined} unitAmountIn
  * @param {Partial<import('../../src/auction/params.js').AuctionParams>} actionParamArgs
+ * @param {{
+ *   btc: any;
+ *   btcPrice: Ratio;
+ *   btcAmountIn: any;
+ * } | undefined} extraAssetKit
  */
 export const setupElectorateReserveAndAuction = async (
   t,
@@ -461,6 +466,7 @@ export const setupElectorateReserveAndAuction = async (
     AuctionStartDelay = 10n,
     PriceLockPeriod = 3n,
   },
+  extraAssetKit = undefined,
 ) => {
   const {
     zoe,
@@ -484,21 +490,40 @@ export const setupElectorateReserveAndAuction = async (
   // @ts-expect-error scriptedPriceAuthority doesn't actually match this, but manualPriceAuthority does
   const aethTestPriceAuthority = Array.isArray(priceOrList)
     ? makeScriptedPriceAuthority({
-        actualBrandIn: aeth.brand,
-        actualBrandOut: run.brand,
-        priceList: priceOrList,
-        timer,
-        quoteMint: quoteIssuerKit.mint,
-        unitAmountIn,
-        quoteInterval,
-      })
+      actualBrandIn: aeth.brand,
+      actualBrandOut: run.brand,
+      priceList: priceOrList,
+      timer,
+      quoteMint: quoteIssuerKit.mint,
+      unitAmountIn,
+      quoteInterval,
+    })
     : makeManualPriceAuthority({
-        actualBrandIn: aeth.brand,
-        actualBrandOut: run.brand,
-        initialPrice: priceOrList,
-        timer,
-        quoteIssuerKit,
-      });
+      actualBrandIn: aeth.brand,
+      actualBrandOut: run.brand,
+      initialPrice: priceOrList,
+      timer,
+      quoteIssuerKit,
+    });
+
+  const abtcTestPriceAuthority = extraAssetKit ? (Array.isArray(extraAssetKit.btcPrice)
+    ? makeScriptedPriceAuthority({
+      actualBrandIn: extraAssetKit.btc.brand,
+      actualBrandOut: run.brand,
+      priceList: extraAssetKit.btcPrice,
+      timer,
+      quoteMint: quoteIssuerKit.mint,
+      unitAmountIn: extraAssetKit.btcAmountIn,
+      quoteInterval,
+    })
+    : makeManualPriceAuthority({
+      actualBrandIn: extraAssetKit.btc.brand,
+      actualBrandOut: run.brand,
+      initialPrice: extraAssetKit.btcPrice,
+      timer,
+      quoteIssuerKit,
+    })) : undefined;
+
   const baggage = makeScalarBigMapStore('baggage');
   const { priceAuthority: priceAuthorityReg, adminFacet: priceAuthorityAdmin } =
     providePriceAuthorityRegistry(baggage);
@@ -507,6 +532,14 @@ export const setupElectorateReserveAndAuction = async (
     aeth.brand,
     run.brand,
   );
+
+  if (extraAssetKit && abtcTestPriceAuthority) {
+    await E(priceAuthorityAdmin).registerPriceAuthority(
+      abtcTestPriceAuthority,
+      extraAssetKit.btc.brand,
+      run.brand,
+    );
+  }
 
   space.produce.priceAuthority.resolve(priceAuthorityReg);
 
@@ -526,5 +559,6 @@ export const setupElectorateReserveAndAuction = async (
     priceAuthority: priceAuthorityReg,
     priceAuthorityAdmin,
     aethTestPriceAuthority,
+    abtcTestPriceAuthority
   };
 };

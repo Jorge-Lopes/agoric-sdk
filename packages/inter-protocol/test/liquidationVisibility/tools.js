@@ -3,7 +3,7 @@ import { makeIssuerKit } from '@agoric/ertp';
 import { unsafeMakeBundleCache } from '@agoric/swingset-vat/tools/bundleTool.js';
 import { allValues, makeTracer, objectMap } from '@agoric/internal';
 import { buildManualTimer } from '@agoric/swingset-vat/tools/manual-timer.js';
-import { makeRatioFromAmounts } from '@agoric/zoe/src/contractSupport/index.js';
+import { makeRatio, makeRatioFromAmounts } from '@agoric/zoe/src/contractSupport/index.js';
 import { eventLoopIteration } from '@agoric/internal/src/testing-utils.js';
 import { TimeMath } from '@agoric/time';
 import { subscribeEach } from '@agoric/notifier';
@@ -34,6 +34,9 @@ export const setupBasics = async (zoe, contractsWrapper) => {
   const aeth = withAmountUtils(
     makeIssuerKit('aEth', 'nat', { decimalPlaces: 6 }),
   );
+  const abtc = withAmountUtils(
+    makeIssuerKit('aBtc', 'nat', { decimalPlaces: 6 }),
+  );
 
   if (contractsWrapper) {
     contractRoots = { ...contractRoots, ...contractsWrapper };
@@ -51,6 +54,7 @@ export const setupBasics = async (zoe, contractsWrapper) => {
   return {
     run,
     aeth,
+    abtc,
     bundleCache,
     bundles,
     installation,
@@ -89,11 +93,13 @@ export const setupServices = async (
   timer = buildManualTimer(),
   quoteInterval = 1n,
   auctionParams = {},
+  setupExtraAsset = false,
 ) => {
   const {
     zoe,
     run,
     aeth,
+    abtc,
     interestTiming,
     minInitialDebt,
     referencedUi,
@@ -102,7 +108,18 @@ export const setupServices = async (
 
   t.context.timer = timer;
 
-  const { space, priceAuthorityAdmin, aethTestPriceAuthority } =
+  const btcKit = setupExtraAsset ? {
+    btc: abtc,
+    btcPrice: makeRatio(50n, run.brand, 10n, abtc.brand),
+    btcAmountIn: abtc.make(400n),
+  } : undefined;
+
+  const {
+    space,
+    priceAuthorityAdmin,
+    aethTestPriceAuthority,
+    abtcTestPriceAuthority,
+  } =
     await setupElectorateReserveAndAuction(
       t,
       // @ts-expect-error inconsistent types with withAmountUtils
@@ -112,6 +129,7 @@ export const setupServices = async (
       quoteInterval,
       unitAmountIn,
       auctionParams,
+      btcKit,
     );
 
   const {
@@ -143,6 +161,16 @@ export const setupServices = async (
     rates,
   );
 
+  let abtcVaultManagerP = undefined;
+  if (setupExtraAsset) {
+    await eventLoopIteration();
+    abtcVaultManagerP = E(vaultFactoryCreatorFacetP).addVaultType(
+      abtc.issuer,
+      'ABtc',
+      rates,
+    );
+  }
+
   /** @typedef {import('../../src/proposals/econ-behaviors.js').AuctioneerKit} AuctioneerKit */
   /** @typedef {import('@agoric/zoe/tools/manualPriceAuthority.js').ManualPriceAuthority} ManualPriceAuthority */
   /** @typedef {import('../../src/vaultFactory/vaultFactory.js').VaultFactoryContract} VFC */
@@ -152,9 +180,11 @@ export const setupServices = async (
    *   VaultFactoryCreatorFacet,
    *   VFC['publicFacet'],
    *   VaultManager,
+   *   VaultManager | undefined,
    *   AuctioneerKit,
    *   ManualPriceAuthority,
    *   CollateralManager,
+   *   CollateralManager | undefined,
    *   chainStorage,
    *   board,
    * ]}
@@ -164,9 +194,11 @@ export const setupServices = async (
     vaultFactory, // creator
     vfPublic,
     aethVaultManager,
+    abtcVaultManager,
     auctioneerKit,
     priceAuthority,
     aethCollateralManager,
+    abtcCollateralManager,
     chainStorage,
     board,
   ] = await Promise.all([
@@ -174,9 +206,11 @@ export const setupServices = async (
     vaultFactoryCreatorFacetP,
     E.get(consume.vaultFactoryKit).publicFacet,
     aethVaultManagerP,
+    abtcVaultManagerP || Promise.resolve(undefined),
     consume.auctioneerKit,
     /** @type {Promise<ManualPriceAuthority>} */ (consume.priceAuthority),
     E(aethVaultManagerP).getPublicFacet(),
+    abtcVaultManagerP ? E(abtcVaultManagerP).getPublicFacet() : Promise.resolve(undefined),
     consume.chainStorage,
     consume.board,
   ]);
@@ -198,10 +232,15 @@ export const setupServices = async (
       vfPublic,
       aethVaultManager,
       aethCollateralManager,
+      abtcVaultManager,
+      abtcCollateralManager,
     },
   };
 
   await E(auctioneerKit.creatorFacet).addBrand(aeth.issuer, 'Aeth');
+  if (setupExtraAsset) {
+    await E(auctioneerKit.creatorFacet).addBrand(abtc.issuer, 'ABtc');
+  }
 
   return {
     zoe,
@@ -215,6 +254,7 @@ export const setupServices = async (
     auctioneerKit,
     priceAuthorityAdmin,
     aethTestPriceAuthority,
+    abtcTestPriceAuthority,
     chainStorage,
     board,
   };
