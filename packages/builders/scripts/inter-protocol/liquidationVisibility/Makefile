@@ -16,8 +16,8 @@ PROPOSAL_BUILDER = ${shell pwd}/proposal-builder.js
 HOME = $(SDK_ROOT)/packages/cosmic-swingset/t1/bootstrap
 LOCAL_WALLET = bootstrap
 
-VAULT_BUNDLE_ID = @cache/$(call GetFromPlan, bundles[0].bundleID).json
-MANIFEST_BUNDLE_ID = @cache/$(call GetFromPlan, bundles[1].bundleID).json
+VAULT_BUNDLE_ID = @/Users/jorgelopes/Documents/GitHub/Agoric/sow6/liquidation-visibility/agoric-sdk-liquidation-visibility/packages/cosmic-swingset/t1/bootstrap/.agoric/cache/$(call GetFromPlan, bundles[0].bundleID).json
+MANIFEST_BUNDLE_ID = @/Users/jorgelopes/Documents/GitHub/Agoric/sow6/liquidation-visibility/agoric-sdk-liquidation-visibility/packages/cosmic-swingset/t1/bootstrap/.agoric/cache/$(call GetFromPlan, bundles[1].bundleID).json
 
 define GetFromPlan
 $(shell node -p "require('./vaultFactory-plan.json').$(1)")

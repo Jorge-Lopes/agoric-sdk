@@ -1,6 +1,8 @@
 import { startVaultFactory } from '@agoric/inter-protocol/src/proposals/econ-behaviors.js';
 import { Stable } from '@agoric/internal/src/tokens.js';
 
+export { startVaultFactory };
+
 const VAULT_FACTORY_MANIFEST = harden({
   [startVaultFactory.name]: {
     consume: {
@@ -39,12 +41,7 @@ const VAULT_FACTORY_MANIFEST = harden({
 
 export const getManifestForVaultFactory = (
   { restoreRef },
-  {
-    installKeys,
-    vaultFactoryControllerAddress,
-    minInitialPoolLiquidity,
-    referencedUi,
-  },
+  { installKeys, vaultFactoryControllerAddress },
 ) => {
   return {
     manifest: VAULT_FACTORY_MANIFEST,
@@ -53,8 +50,6 @@ export const getManifestForVaultFactory = (
     },
     options: {
       vaultFactoryControllerAddress,
-      minInitialPoolLiquidity,
-      referencedUi,
     },
   };
 };

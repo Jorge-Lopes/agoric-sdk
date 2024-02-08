@@ -6,8 +6,8 @@ import { getManifestForVaultFactory } from './manifest.js';
 /** @type {Record<string, Record<string, [string, string]>>} */
 const installKeys = {
   vaultFactory: [
-    '@agoric/inter-protocol/src/vaultFactory/vaultFactory.js',
-    '@agoric/builders/scripts/inter-protocol/liquidationVisibility/bundles/bundle-vaultFactory.js',
+    '../../../../inter-protocol/src/vaultFactory/vaultFactory.js',
+    './bundles/bundle-vaultFactory.js',
   ],
 };
 
@@ -24,7 +24,7 @@ export const vaultFactoryUpdateProposalBuilder = async ({
   install: install0,
   wrapInstall,
 }) => {
-  const { VAULT_FACTORY_CONTROLLER_ADDR } = process.env;
+  const { VAULT_FACTORY_CONTROLLER_ADDR } = {};
 
   const install = wrapInstall ? wrapInstall(install0) : install0;
 
@@ -50,11 +50,7 @@ export const vaultFactoryUpdateProposalBuilder = async ({
 };
 
 export default async (homeP, endowments) => {
-  const helperEndowments = {
-    ...endowments,
-    cacheDir: endowments.pathResolve(process.cwd(), 'cache'),
-  };
-  const { writeCoreProposal } = await makeHelpers(homeP, helperEndowments);
+  const { writeCoreProposal } = await makeHelpers(homeP, endowments);
 
   const tool = await makeInstallCache(homeP, {
     loadBundle: spec => import(spec),
