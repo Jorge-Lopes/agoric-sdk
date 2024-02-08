@@ -18,13 +18,6 @@ const trace = makeTracer('LIQ');
 /** @typedef {import('@agoric/time').CancelToken} CancelToken */
 /** @typedef {import('@agoric/time').RelativeTimeRecord} RelativeTimeRecord */
 
-/**
- * @typedef {MapStore<
- *   Vault,
- *   { collateralAmount: Amount<'nat'>; debtAmount: Amount<'nat'> }
- * >} VaultData
- */
-
 const makeCancelToken = makeCancelTokenMaker('liq');
 
 /**
@@ -276,7 +269,12 @@ export const getLiquidatableVaults = (
   const vaultsToLiquidate = prioritizedVaults.removeVaultsBelow(
     collateralizationDetails,
   );
-  /** @type {VaultData} */
+  /**
+   * @type {MapStore<
+   *   Vault,
+   *   { collateralAmount: Amount<'nat'>; debtAmount: Amount<'nat'> }
+   * >}
+   */
   const vaultData = makeScalarMapStore();
 
   const { zcfSeat: liqSeat } = zcf.makeEmptySeatKit();
