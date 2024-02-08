@@ -26,7 +26,7 @@ import {
   NotifierShape,
   RatioShape,
 } from '@agoric/ertp';
-import { makeTracer } from '@agoric/internal';
+import { allValuesSettled, makeTracer } from '@agoric/internal';
 import { makeStoredNotifier, observeNotifier } from '@agoric/notifier';
 import { appendToStoredArray } from '@agoric/store/src/stores/store-utils.js';
 import {
@@ -1385,21 +1385,16 @@ export const prepareVaultManagerKit = (
           // we don't want those failures to prevent liquidation process from going forward.
           // We don't handle the case where 'makeDeposit' rejects as liquidation depends on
           // 'makeDeposit' being fulfilled.
-          await null;
-          const [
-            { userSeatPromise, deposited },
+          const {
+            makeDeposit: { userSeatPromise, deposited },
             liquidationVisibilityWriters,
             auctionSchedule,
-          ] = (
-            await Promise.allSettled([
-              makeDeposit,
+          } = await allValuesSettled({
+            makeDeposit,
+            liquidationVisibilityWriters:
               helper.makeLiquidationVisibilityWriters(timestamp),
-              schedulesP,
-            ])
-          )
-            .filter(result => result.status === 'fulfilled')
-            // @ts-expect-error
-            .map(result => result.value);
+            auctionSchedule: schedulesP,
+          });
 
           void helper.writeLiqVisibility(liquidationVisibilityWriters, [
             ['writePreAuction', vaultData],

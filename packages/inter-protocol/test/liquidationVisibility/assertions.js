@@ -68,10 +68,15 @@ export const assertVaultCurrentDebt = async (t, vault, debt) => {
   );
 };
 
-export const assertVaultCollateral = async (t, vault, collateralValue) => {
+export const assertVaultCollateral = async (
+  t,
+  vault,
+  collateralValue,
+  asset,
+) => {
   const collateralAmount = await E(vault).getCollateralAmount();
 
-  t.deepEqual(collateralAmount, t.context.aeth.make(collateralValue));
+  t.deepEqual(collateralAmount, asset.make(collateralValue));
 };
 
 export const assertMintedAmount = async (t, vaultSeat, wantMinted) => {
@@ -94,11 +99,16 @@ export const assertMintedProceeds = async (t, vaultSeat, wantMinted) => {
   );
 };
 
-export const assertVaultLocked = async (t, vaultNotifier, lockedValue) => {
+export const assertVaultLocked = async (
+  t,
+  vaultNotifier,
+  lockedValue,
+  asset,
+) => {
   const notification = await E(vaultNotifier).getUpdateSince();
   const lockedAmount = notification.value.locked;
 
-  t.deepEqual(lockedAmount, t.context.aeth.make(lockedValue));
+  t.deepEqual(lockedAmount, asset.make(lockedValue));
 };
 
 export const assertVaultDebtSnapshot = async (t, vaultNotifier, wantMinted) => {
@@ -139,7 +149,7 @@ export const assertVaultFactoryRewardAllocation = async (
   });
 };
 
-export const assertCollateralProceeds = async (t, seat, colWanted) => {
+export const assertCollateralProceeds = async (t, seat, colWanted, issuer) => {
   const { Collateral: withdrawnCol } = await E(seat).getFinalAllocation();
   const proceeds4 = await E(seat).getPayouts();
   t.deepEqual(withdrawnCol, colWanted);
@@ -147,7 +157,7 @@ export const assertCollateralProceeds = async (t, seat, colWanted) => {
   const collateralWithdrawn = await proceeds4.Collateral;
   t.truthy(
     AmountMath.isEqual(
-      await E(t.context.aeth.issuer).getAmountOf(collateralWithdrawn),
+      await E(issuer).getAmountOf(collateralWithdrawn),
       colWanted,
     ),
   );

@@ -3,20 +3,23 @@ import { makeIssuerKit } from '@agoric/ertp';
 import { unsafeMakeBundleCache } from '@agoric/swingset-vat/tools/bundleTool.js';
 import { allValues, makeTracer, objectMap } from '@agoric/internal';
 import { buildManualTimer } from '@agoric/swingset-vat/tools/manual-timer.js';
-import { makeRatioFromAmounts } from '@agoric/zoe/src/contractSupport/index.js';
+import {
+  makeRatio,
+  makeRatioFromAmounts,
+} from '@agoric/zoe/src/contractSupport/index.js';
 import { eventLoopIteration } from '@agoric/internal/src/testing-utils.js';
 import { TimeMath } from '@agoric/time';
 import { subscribeEach } from '@agoric/notifier';
 import '../../src/vaultFactory/types.js';
 import { withAmountUtils } from '../supports.js';
-import {
-  getRunFromFaucet,
-  setupElectorateReserveAndAuction,
-} from '../vaultFactory/vaultFactoryUtils.js';
+import { getRunFromFaucet } from '../vaultFactory/vaultFactoryUtils.js';
 import { subscriptionTracker, vaultManagerMetricsTracker } from '../metrics.js';
 import { startVaultFactory } from '../../src/proposals/econ-behaviors.js';
+import { setupElectorateReserveAndAuction } from './mock-setupChainStorage.js';
 
-const contractRoots = {
+export const BASIS_POINTS = 10000n;
+
+let contractRoots = {
   faucet: './test/vaultFactory/faucet.js',
   VaultFactory: './src/vaultFactory/vaultFactory.js',
   reserve: './src/reserve/assetReserve.js',
@@ -25,7 +28,7 @@ const contractRoots = {
 
 const trace = makeTracer('VisibilityTools', true);
 
-export const setupBasics = async zoe => {
+export const setupBasics = async (zoe, contractsWrapper) => {
   const stableIssuer = await E(zoe).getFeeIssuer();
   const stableBrand = await E(stableIssuer).getBrand();
 
@@ -34,6 +37,13 @@ export const setupBasics = async zoe => {
   const aeth = withAmountUtils(
     makeIssuerKit('aEth', 'nat', { decimalPlaces: 6 }),
   );
+  const abtc = withAmountUtils(
+    makeIssuerKit('aBtc', 'nat', { decimalPlaces: 6 }),
+  );
+
+  if (contractsWrapper) {
+    contractRoots = { ...contractRoots, ...contractsWrapper };
+  }
 
   const bundleCache = await unsafeMakeBundleCache('./bundles/');
   const bundles = await allValues({
@@ -47,6 +57,7 @@ export const setupBasics = async zoe => {
   return {
     run,
     aeth,
+    abtc,
     bundleCache,
     bundles,
     installation,
@@ -77,6 +88,7 @@ export const setupBasics = async zoe => {
  * @param {import('@agoric/time').TimerService} timer
  * @param {RelativeTime} quoteInterval
  * @param {Partial<import('../../src/auction/params.js').AuctionParams>} [auctionParams]
+ * @param setupExtraAsset
  */
 export const setupServices = async (
   t,
@@ -85,11 +97,13 @@ export const setupServices = async (
   timer = buildManualTimer(),
   quoteInterval = 1n,
   auctionParams = {},
+  setupExtraAsset = false,
 ) => {
   const {
     zoe,
     run,
     aeth,
+    abtc,
     interestTiming,
     minInitialDebt,
     referencedUi,
@@ -98,17 +112,30 @@ export const setupServices = async (
 
   t.context.timer = timer;
 
-  const { space, priceAuthorityAdmin, aethTestPriceAuthority } =
-    await setupElectorateReserveAndAuction(
-      t,
-      // @ts-expect-error inconsistent types with withAmountUtils
-      run,
-      aeth,
-      priceOrList,
-      quoteInterval,
-      unitAmountIn,
-      auctionParams,
-    );
+  const btcKit = setupExtraAsset
+    ? {
+        btc: abtc,
+        btcPrice: makeRatio(50n, run.brand, 10n, abtc.brand),
+        btcAmountIn: abtc.make(400n),
+      }
+    : undefined;
+
+  const {
+    space,
+    priceAuthorityAdmin,
+    aethTestPriceAuthority,
+    abtcTestPriceAuthority,
+  } = await setupElectorateReserveAndAuction(
+    t,
+    // @ts-expect-error inconsistent types with withAmountUtils
+    run,
+    aeth,
+    priceOrList,
+    quoteInterval,
+    unitAmountIn,
+    auctionParams,
+    btcKit,
+  );
 
   const {
     consume,
@@ -139,6 +166,16 @@ export const setupServices = async (
     rates,
   );
 
+  let abtcVaultManagerP;
+  if (setupExtraAsset) {
+    await eventLoopIteration();
+    abtcVaultManagerP = E(vaultFactoryCreatorFacetP).addVaultType(
+      abtc.issuer,
+      'ABtc',
+      rates,
+    );
+  }
+
   /** @typedef {import('../../src/proposals/econ-behaviors.js').AuctioneerKit} AuctioneerKit */
   /** @typedef {import('@agoric/zoe/tools/manualPriceAuthority.js').ManualPriceAuthority} ManualPriceAuthority */
   /** @typedef {import('../../src/vaultFactory/vaultFactory.js').VaultFactoryContract} VFC */
@@ -148,9 +185,11 @@ export const setupServices = async (
    *   VaultFactoryCreatorFacet,
    *   VFC['publicFacet'],
    *   VaultManager,
+   *   VaultManager | undefined,
    *   AuctioneerKit,
    *   ManualPriceAuthority,
    *   CollateralManager,
+   *   CollateralManager | undefined,
    *   chainStorage,
    *   board,
    * ]}
@@ -160,9 +199,11 @@ export const setupServices = async (
     vaultFactory, // creator
     vfPublic,
     aethVaultManager,
+    abtcVaultManager,
     auctioneerKit,
     priceAuthority,
     aethCollateralManager,
+    abtcCollateralManager,
     chainStorage,
     board,
   ] = await Promise.all([
@@ -170,9 +211,13 @@ export const setupServices = async (
     vaultFactoryCreatorFacetP,
     E.get(consume.vaultFactoryKit).publicFacet,
     aethVaultManagerP,
+    abtcVaultManagerP || Promise.resolve(undefined),
     consume.auctioneerKit,
     /** @type {Promise<ManualPriceAuthority>} */ (consume.priceAuthority),
     E(aethVaultManagerP).getPublicFacet(),
+    abtcVaultManagerP
+      ? E(abtcVaultManagerP).getPublicFacet()
+      : Promise.resolve(undefined),
     consume.chainStorage,
     consume.board,
   ]);
@@ -194,10 +239,15 @@ export const setupServices = async (
       vfPublic,
       aethVaultManager,
       aethCollateralManager,
+      abtcVaultManager,
+      abtcCollateralManager,
     },
   };
 
   await E(auctioneerKit.creatorFacet).addBrand(aeth.issuer, 'Aeth');
+  if (setupExtraAsset) {
+    await E(auctioneerKit.creatorFacet).addBrand(abtc.issuer, 'ABtc');
+  }
 
   return {
     zoe,
@@ -211,6 +261,7 @@ export const setupServices = async (
     auctioneerKit,
     priceAuthorityAdmin,
     aethTestPriceAuthority,
+    abtcTestPriceAuthority,
     chainStorage,
     board,
   };
