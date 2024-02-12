@@ -697,12 +697,12 @@ export const prepareVaultManagerKit = (
           /** @param {VaultData} vaultData */
           const writePreAuction = vaultData => {
             /** @type PreAuctionState */
-            const preAuctionState = [...vaultData.entries()]
-              .reverse()
-              .map(([vault, data]) => [
+            const preAuctionState = [...vaultData.entries()].map(
+              ([vault, data]) => [
                 `vault${vault.getVaultState().idInManager}`,
                 { ...data },
-              ]);
+              ],
+            );
 
             return E(
               liquidationRecorderKits.preAuctionRecorderKit.recorder,
