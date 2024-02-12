@@ -30,11 +30,12 @@ type AnyFunction = (...args: any[]) => any;
 
 //#region Product spec
 const setup: LiquidationSetup = {
+  // Vaults are sorted in the worst debt/col ratio to the best
   vaults: [
     {
       atom: 15,
-      ist: 100,
-      debt: 100.5,
+      ist: 105,
+      debt: 105.525,
     },
     {
       atom: 15,
@@ -43,8 +44,8 @@ const setup: LiquidationSetup = {
     },
     {
       atom: 15,
-      ist: 105,
-      debt: 105.525,
+      ist: 100,
+      debt: 100.5,
     },
   ],
   bids: [
@@ -85,15 +86,16 @@ const outcome: LiquidationOutcome = {
     },
     shortfall: 0,
   },
+  // The order in the setup preserved
   vaults: [
     {
-      locked: 3.425146,
+      locked: 2.846403,
     },
     {
       locked: 3.0779,
     },
     {
-      locked: 2.846403,
+      locked: 3.425146,
     },
   ],
 };
@@ -240,7 +242,9 @@ const checkVisibility = async ({
     string,
     { Collateral?: { value: bigint }; Minted?: { value: bigint } },
   ][] = [];
-  for (let i = 0; i < outcome.vaults.length; i += 1) {
+  // Iterate from the end because we expect the post auction vaults
+  // in best to worst order.
+  for (let i = outcome.vaults.length - 1; i >= 0; i -= 1) {
     expectedPostAuction.push([
       `vault${base + i}`,
       { Collateral: { value: scale6(outcome.vaults[i].locked) } },
