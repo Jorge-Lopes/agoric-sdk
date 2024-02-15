@@ -50,7 +50,12 @@ export const vaultFactoryUpdateProposalBuilder = async ({
 };
 
 export default async (homeP, endowments) => {
-  const { writeCoreProposal } = await makeHelpers(homeP, endowments);
+  const endowmentsHelper = {
+    ...endowments,
+    cacheDir: endowments.pathResolve(process.cwd(), 'cache'),
+  };
+
+  const { writeCoreProposal } = await makeHelpers(homeP, endowmentsHelper);
 
   const tool = await makeInstallCache(homeP, {
     loadBundle: spec => import(spec),
