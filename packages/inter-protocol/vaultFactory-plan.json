@@ -1,0 +1,17 @@
+{
+  "name": "vaultFactory",
+  "script": "vaultFactory.js",
+  "permit": "vaultFactory-permit.json",
+  "bundles": [
+    {
+      "entrypoint": "../../../../inter-protocol/src/vaultFactory/vaultFactory.js",
+      "bundleID": "b1-5302546fafc63a2ef36142fb50c2333eb5e6775f6eebb725d1e3ce83aad7b27b3341992d9d83488383bfd19784b241fccc29a8cb9eeb9ebf33059b3976ff9b22",
+      "fileName": "/Users/jorgelopes/Documents/GitHub/Agoric/sow6/liquidation-visibility/agoric-sdk-liquidation-visibility/packages/inter-protocol/cache/b1-5302546fafc63a2ef36142fb50c2333eb5e6775f6eebb725d1e3ce83aad7b27b3341992d9d83488383bfd19784b241fccc29a8cb9eeb9ebf33059b3976ff9b22.json"
+    },
+    {
+      "entrypoint": "./manifest.js",
+      "bundleID": "b1-91a1a9da1dfa3bc6d3a8918cc6ff013869ebdf4b8df64ebd70e745289e32a382fc5850ce1b717b26b7707bdc861fb62aa2e840038d95f8082f8bb2656a01afce",
+      "fileName": "/Users/jorgelopes/Documents/GitHub/Agoric/sow6/liquidation-visibility/agoric-sdk-liquidation-visibility/packages/inter-protocol/cache/b1-91a1a9da1dfa3bc6d3a8918cc6ff013869ebdf4b8df64ebd70e745289e32a382fc5850ce1b717b26b7707bdc861fb62aa2e840038d95f8082f8bb2656a01afce.json"
+    }
+  ]
+}
