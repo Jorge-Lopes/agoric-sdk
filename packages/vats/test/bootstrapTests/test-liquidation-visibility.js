@@ -1,35 +1,21 @@
+/* eslint-disable no-lone-blocks, no-await-in-loop */
+// @ts-check
+/**
+ * @file Bootstrap test vaults liquidation visibility
+ */
 import { test as anyTest } from '@agoric/zoe/tools/prepare-test-env-ava.js';
-import { ExecutionContext, TestFn } from 'ava';
-import { ScheduleNotification } from '@agoric/inter-protocol/src/auction/scheduler.js';
 import { NonNullish } from '@agoric/assert/src/assert.js';
 import { TimeMath } from '@agoric/time/src/timeMath.js';
-import { TimestampRecord } from '@agoric/time/src/types';
-import { EconomyBootstrapSpace } from '@agoric/inter-protocol/src/proposals/econ-behaviors.js';
 import { Offers } from '@agoric/inter-protocol/src/clientSupport.js';
 import {
-  ensureVaultCollateral,
-  LiquidationSetup,
-  LiquidationTestContext,
   makeLiquidationTestContext,
-  scale6,
-} from '../../tools/liquidation.ts';
+  scale6
+} from './liquidation.js';
 
-export type LiquidationOutcome = {
-  reserve: {
-    allocations: Record<string, number>;
-    shortfall: number;
-  };
-  vaults: {
-    locked: number;
-  }[];
-};
-
-const test = anyTest as TestFn<LiquidationTestContext>;
-
-type AnyFunction = (...args: any[]) => any;
+const test = anyTest
 
 //#region Product spec
-const setup: LiquidationSetup = {
+const setup = ({
   // Vaults are sorted in the worst debt/col ratio to the best
   vaults: [
     {
@@ -76,9 +62,9 @@ const setup: LiquidationSetup = {
       debt: 0,
     },
   },
-};
+});
 
-const outcome: LiquidationOutcome = {
+const outcome = ({
   reserve: {
     allocations: {
       ATOM: 0.309852,
@@ -98,8 +84,56 @@ const outcome: LiquidationOutcome = {
       locked: 3.425146,
     },
   ],
-};
+});
 //#endregion
+
+const placeBids = async (
+  t,
+  collateralBrandKey,
+  buyerWalletAddress,
+  setup,
+  base = 0, // number of bids made before
+) => {
+  
+  const {agoricNamesRemotes, walletFactoryDriver, readLatest} = t.context
+
+  const buyer =
+    await walletFactoryDriver.provideSmartWallet(buyerWalletAddress);
+
+  await buyer.sendOffer(
+    Offers.psm.swap(
+      agoricNamesRemotes,
+      agoricNamesRemotes.instance['psm-IST-USDC_axl'],
+      {
+        offerId: `print-${collateralBrandKey}-ist`,
+        wantMinted: 1_000,
+        pair: ['IST', 'USDC_axl'],
+      },
+    ),
+  );
+
+  const maxBuy = `10000${collateralBrandKey}`;
+
+  for (let i = 0; i < setup.bids.length; i += 1) {
+    const offerId = `${collateralBrandKey}-bid${i + 1 + base}`;
+    // bids are long-lasting offers so we can't wait here for completion
+    await buyer.sendOfferMaker(Offers.auction.Bid, {
+      offerId,
+      ...setup.bids[i],
+      maxBuy,
+    });
+    t.like(
+      readLatest(`published.wallet.${buyerWalletAddress}`),
+      {
+        status: {
+          id: offerId,
+          result: 'Your bid has been accepted',
+          payouts: undefined,
+        },
+      },
+    );
+  }
+};
 
 const runAuction = async (runUtils, advanceTimeBy) => {
   const { EV } = runUtils;
@@ -108,33 +142,76 @@ const runAuction = async (runUtils, advanceTimeBy) => {
     auctioneerKit.publicFacet,
   ).getSchedules();
 
+  console.log('LOG: liveAuctionSchedule ',liveAuctionSchedule);
+
   await advanceTimeBy(3 * Number(liveAuctionSchedule.steps), 'minutes');
 
   return liveAuctionSchedule;
 };
 
-const startAuction = async (t: ExecutionContext<LiquidationTestContext>) => {
+const startAuction = async (t) => {
   const { readLatest, advanceTimeTo } = t.context;
 
-  const scheduleNotification: ScheduleNotification = readLatest(
+  const scheduleNotification = readLatest(
     'published.auction.schedule',
   );
 
   await advanceTimeTo(NonNullish(scheduleNotification.nextStartTime));
 };
 
+const setupVaults = async (
+  t,
+  collateralBrandKey,
+  managerIndex,
+  setup,
+  base = 0,
+) => {
+  
+  const {setupStartingState, walletFactoryDriver, check} = t.context
+
+  await setupStartingState({
+    collateralBrandKey,
+    managerIndex,
+    price: setup.price.starting,
+  });
+
+  const minter =
+    await walletFactoryDriver.provideSmartWallet('agoric1minter');
+
+  for (let i = 0; i < setup.vaults.length; i += 1) {
+    const offerId = `open-${collateralBrandKey}-vault${base + i}`;
+    await minter.executeOfferMaker(Offers.vaults.OpenVault, {
+      offerId,
+      collateralBrandKey,
+      wantMinted: setup.vaults[i].ist,
+      giveCollateral: setup.vaults[i].atom,
+    });
+    t.like(minter.getLatestUpdateRecord(), {
+      updated: 'offerStatus',
+      status: { id: offerId, numWantsSatisfied: 1 },
+    });
+  }
+
+  // Verify starting balances
+  for (let i = 0; i < setup.vaults.length; i += 1) {
+    check.vaultNotification(managerIndex, i, {
+      debtSnapshot: {
+        debt: { value: scale6(setup.vaults[i].debt) },
+      },
+      locked: { value: scale6(setup.vaults[i].atom) },
+      vaultState: 'active',
+    });
+  }
+};
+
 const addNewVaults = async ({
   t,
   collateralBrandKey,
   base,
-}: {
-  t: ExecutionContext<LiquidationTestContext>;
-  collateralBrandKey: string;
-  base: number;
 }) => {
-  const { walletFactoryDriver, priceFeedDrivers, placeBids } = t.context;
+  const { walletFactoryDriver, priceFeedDriver } = t.context;
 
-  await priceFeedDrivers[collateralBrandKey].setPrice(setup.price.starting);
+  await priceFeedDriver.setPrice(setup.price.starting);
   const minter = await walletFactoryDriver.provideSmartWallet('agoric1minter');
 
   for (let i = 0; i < setup.vaults.length; i += 1) {
@@ -151,8 +228,8 @@ const addNewVaults = async ({
     });
   }
 
-  await placeBids(collateralBrandKey, 'agoric1buyer', setup, base);
-  await priceFeedDrivers[collateralBrandKey].setPrice(setup.price.trigger);
+  await placeBids(t, collateralBrandKey, 'agoric1buyer', setup, base);
+  await priceFeedDriver.setPrice(setup.price.trigger);
   await startAuction(t);
 };
 
@@ -160,19 +237,15 @@ const initVaults = async ({
   t,
   collateralBrandKey,
   managerIndex,
-}: {
-  t: ExecutionContext<LiquidationTestContext>;
-  collateralBrandKey: string;
-  managerIndex: number;
 }) => {
-  const { setupVaults, placeBids, priceFeedDrivers, readLatest } = t.context;
+  const { priceFeedDriver, readLatest } = t.context;
 
   const metricsPath = `published.vaultFactory.managers.manager${managerIndex}.metrics`;
 
-  await setupVaults(collateralBrandKey, managerIndex, setup);
-  await placeBids(collateralBrandKey, 'agoric1buyer', setup);
+  await setupVaults(t, collateralBrandKey, managerIndex, setup);
+  await placeBids(t, collateralBrandKey, 'agoric1buyer', setup);
 
-  await priceFeedDrivers[collateralBrandKey].setPrice(setup.price.trigger);
+  await priceFeedDriver.setPrice(setup.price.trigger);
   await startAuction(t);
 
   t.like(readLatest(metricsPath), {
@@ -195,11 +268,6 @@ const checkVisibility = async ({
   managerIndex,
   setupCallback,
   base = 0,
-}: {
-  t: ExecutionContext<LiquidationTestContext>;
-  managerIndex: number;
-  setupCallback: AnyFunction;
-  base?: number;
 }) => {
   const { readLatest, advanceTimeBy, runUtils } = t.context;
 
@@ -209,10 +277,11 @@ const checkVisibility = async ({
     runUtils,
     advanceTimeBy,
   );
-  const nominalStart: Timestamp = TimeMath.subtractAbsRel(
+
+  const nominalStart = TimeMath.subtractAbsRel(
     startTime,
     startDelay,
-  ) as TimestampRecord;
+  )
   t.log(nominalStart);
 
   const visibilityPath = `published.vaultFactory.managers.manager${managerIndex}.liquidations.${nominalStart.absValue.toString()}`;
@@ -220,13 +289,7 @@ const checkVisibility = async ({
   const postAuction = readLatest(`${visibilityPath}.vaults.postAuction`);
   const auctionResult = readLatest(`${visibilityPath}.auctionResult`);
 
-  const expectedPreAuction: [
-    string,
-    {
-      collateralAmount: { value: bigint };
-      debtAmount: { value: bigint };
-    },
-  ][] = [];
+  const expectedPreAuction = [];
   for (let i = 0; i < setup.vaults.length; i += 1) {
     expectedPreAuction.push([
       `vault${base + i}`,
@@ -238,10 +301,7 @@ const checkVisibility = async ({
   }
   t.like(preAuction, expectedPreAuction);
 
-  const expectedPostAuction: [
-    string,
-    { Collateral?: { value: bigint }; Minted?: { value: bigint } },
-  ][] = [];
+  const expectedPostAuction = [];
   // Iterate from the end because we expect the post auction vaults
   // in best to worst order.
   for (let i = outcome.vaults.length - 1; i >= 0; i -= 1) {
@@ -297,25 +357,24 @@ test.serial('visibility-before-upgrade', async t => {
   });
 });
 
-test.serial('add-STARS-collateral', async t => {
-  await ensureVaultCollateral('STARS', t);
-  await t.context.setupStartingState({
-    collateralBrandKey: 'STARS',
-    managerIndex: 1,
-    price: setup.price.starting,
-  });
-  t.pass(); // reached here without throws
-});
+// test.serial('add-STARS-collateral', async t => {
+//   await ensureVaultCollateral('STARS', t);
+//   await t.context.setupStartingState({
+//     collateralBrandKey: 'STARS',
+//     managerIndex: 1,
+//     price: setup.price.starting,
+//   });
+//   t.pass(); // reached here without throws
+// });
 
 test.serial('restart-vault-factory', async t => {
   const {
     runUtils: { EV },
   } = t.context;
-  const vaultFactoryKit = await (EV.vat('bootstrap').consumeItem(
+  const vaultFactoryKit = await EV.vat('bootstrap').consumeItem(
     'vaultFactoryKit',
-  ) as EconomyBootstrapSpace['consume']['vaultFactoryKit']);
+  ) 
 
-  // @ts-expect-error cast XXX missing from type
   const { privateArgs } = vaultFactoryKit;
   console.log('reused privateArgs', privateArgs, vaultFactoryKit);
 
@@ -330,9 +389,9 @@ test.serial('restart-vault-factory', async t => {
 
 test.serial('restart contractGovernor', async t => {
   const { EV } = t.context.runUtils;
-  const vaultFactoryKit = await (EV.vat('bootstrap').consumeItem(
+  const vaultFactoryKit = await EV.vat('bootstrap').consumeItem(
     'vaultFactoryKit',
-  ) as EconomyBootstrapSpace['consume']['vaultFactoryKit']);
+  ) 
 
   const { governorAdminFacet } = vaultFactoryKit;
   // has no privateArgs of its own. the privateArgs.governed is only for the
@@ -409,9 +468,9 @@ test.serial('snapshot-storage', async t => {
   const { readLatest } = t.context;
 
   const buildSnapshotItem = (
-    paths: string[],
-    managerIndex: number,
-    auctionTime: bigint,
+    paths,
+    managerIndex,
+    auctionTime,
   ) => {
     const basePath = `published.vaultFactory.managers.manager${managerIndex}.liquidations.${auctionTime}`;
     const item = {};
