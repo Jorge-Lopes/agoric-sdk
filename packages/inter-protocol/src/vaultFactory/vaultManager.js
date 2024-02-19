@@ -181,7 +181,7 @@ const trace = makeTracer('VM');
  *   mintedProceeds?: Amount<'nat'>;
  *   collateralSold?: Amount<'nat'>;
  *   collateralRemaining?: Amount<'nat'>;
- *   endTime?: import('@agoric/time').TimestampRecord | null;
+ *   endTime?: import('@agoric/time/src/types.js').TimestampRecord | null;
  * }} AuctionResultState
  *
  * @typedef {{
@@ -694,7 +694,6 @@ export const prepareVaultManagerKit = (
               collateralSold: plan.collateralSold,
               collateralRemaining: plan.collatRemaining,
               // @ts-expect-error
-              // eslint-disable-next-line @endo/no-optional-chaining
               endTime: auctionSchedule?.liveAuctionSchedule.endTime,
             };
             return E(
