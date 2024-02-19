@@ -181,7 +181,7 @@ const trace = makeTracer('VM');
  *   mintedProceeds?: Amount<'nat'>;
  *   collateralSold?: Amount<'nat'>;
  *   collateralRemaining?: Amount<'nat'>;
- *   endTime?: import('@agoric/time').TimestampRecord | null;
+ *   endTime?: import('@agoric/time/src/types.js').TimestampRecord | null;
  * }} AuctionResultState
  *
  * @typedef {{
