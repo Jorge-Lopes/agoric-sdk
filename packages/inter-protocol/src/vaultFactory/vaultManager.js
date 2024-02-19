@@ -694,7 +694,6 @@ export const prepareVaultManagerKit = (
               collateralSold: plan.collateralSold,
               collateralRemaining: plan.collatRemaining,
               // @ts-expect-error
-              // eslint-disable-next-line @endo/no-optional-chaining
               endTime: auctionSchedule?.liveAuctionSchedule.endTime,
             };
             return E(

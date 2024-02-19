@@ -1,11 +1,7 @@
 import { E } from '@endo/eventual-send';
 import { makeIssuerKit } from '@agoric/ertp';
 import { unsafeMakeBundleCache } from '@agoric/swingset-vat/tools/bundleTool.js';
-import {
-  allValues,
-  makeTracer,
-  objectMap,
-} from '@agoric/internal';
+import { allValues, makeTracer, objectMap } from '@agoric/internal';
 import { buildManualTimer } from '@agoric/swingset-vat/tools/manual-timer.js';
 import {
   makeRatio,
@@ -92,7 +88,7 @@ export const setupBasics = async (zoe, contractsWrapper) => {
  * @param {import('@agoric/time').TimerService} timer
  * @param {RelativeTime} quoteInterval
  * @param {Partial<import('../../src/auction/params.js').AuctionParams>} [auctionParams]
- * @param setupExtraAsset
+ * @param {boolean} setupExtraAsset
  */
 export const setupServices = async (
   t,
@@ -283,7 +279,9 @@ export const setClockAndAdvanceNTimes = async (
   let currentTime = start;
   // first time through is at START, then n TIMES more plus INCR
   for (let i = 0; i <= times; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
     await timer.advanceTo(TimeMath.absValue(currentTime));
+    // eslint-disable-next-line no-await-in-loop
     await eventLoopIteration();
     currentTime = TimeMath.addAbsRel(currentTime, TimeMath.relValue(incr));
   }
