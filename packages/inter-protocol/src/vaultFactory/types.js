@@ -13,7 +13,7 @@
  *
  * @typedef {import('@agoric/time').Timestamp} Timestamp
  *
- * @typedef {import('@agoric/time').TimestampRecord} TimestampRecord
+ * @typedef {import('@agoric/time/src/types.js').TimestampRecord} TimestampRecord
  *
  * @typedef {import('@agoric/time').RelativeTime} RelativeTime
  */
