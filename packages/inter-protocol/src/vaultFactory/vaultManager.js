@@ -216,7 +216,6 @@ export const prepareVaultManagerKit = (
   /**
    * @param {HeldParams & {
    *   metricsStorageNode: StorageNode;
-   *   liquidationsStorageNode: StorageNode;
    * }} params
    * @returns {HeldParams & ImmutableState & MutableState}
    */
@@ -276,7 +275,6 @@ export const prepareVaultManagerKit = (
       totalShortfallReceived: zeroDebt,
       vaultCounter: 0,
       lockedQuote: undefined,
-      liquidationsStorageNode: undefined,
     });
   };
 
@@ -390,6 +388,10 @@ export const prepareVaultManagerKit = (
 
           const ephemera = collateralEphemera(collateralBrand);
           ephemera.prioritizedVaults = makePrioritizedVaults(unsettledVaults);
+          // We have to store this in ephemera since we can't add new properties
+          // to the `state`. See https://github.com/Agoric/agoric-sdk/blob/master/packages/SwingSet/docs/virtual-objects.md
+          ephemera.liquidationsStorageNode =
+            E(storageNode).makeChildNode('liquidations');
 
           trace('helper.start() making periodNotifier');
           const periodNotifier = E(timerService).makeNotifier(
@@ -443,19 +445,6 @@ export const prepareVaultManagerKit = (
             },
           });
           trace('helper.start() done');
-        },
-        provideLiquidationStorageNode() {
-          const { state } = this;
-
-          console.log('LOG: provideLiquidationStorageNode');
-
-          const liquidationNodeP = E(state.storageNode).makeChildNode(
-            'liquidations',
-          );
-
-          E.when(liquidationNodeP, liquidationNode => {
-            state.liquidationsStorageNode = liquidationNode;
-          });
         },
         /**
          * @param {Timestamp} updateTime
@@ -750,14 +739,14 @@ export const prepareVaultManagerKit = (
          */
         async makeLiquidationRecorderKits(timestamp) {
           const {
-            state: { liquidationsStorageNode },
+            state: { collateralBrand },
           } = this;
 
-          const { state } = this;
+          const ephemera = collateralEphemera(collateralBrand);
 
-          const timestampStorageNode = E(liquidationsStorageNode).makeChildNode(
-            `${timestamp.absValue}`,
-          );
+          const timestampStorageNode = E(
+            ephemera.liquidationsStorageNode,
+          ).makeChildNode(`${timestamp.absValue}`);
 
           const [
             preAuctionStorageNode,
@@ -1454,7 +1443,6 @@ export const provideAndStartVaultManagerKits = baggage => {
 
   for (const kit of provide(baggage, key, () => noKits)) {
     kit.helper.start();
-    kit.helper.provideLiquidationStorageNode();
   }
 
   trace('provideAndStartVaultManagerKits returning');
