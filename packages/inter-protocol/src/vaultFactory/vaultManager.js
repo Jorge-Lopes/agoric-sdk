@@ -1381,7 +1381,6 @@ export const prepareVaultManagerKit = (
 
     {
       finish: ({ state, facets: { helper } }) => {
-        console.log('LOG: FINISHED');
         helper.start();
         void state.assetTopicKit.recorder.write(
           harden({

@@ -1,5 +1,6 @@
 /* eslint-disable no-lone-blocks, no-await-in-loop */
 // @ts-check
+/* global process */
 /**
  * @file Bootstrap test vaults liquidation visibility
  */
@@ -16,6 +17,7 @@ import {
 import { scale6 } from '../liquidation.js';
 import { makeAgoricNamesRemotesFromFakeStorage } from '../../../tools/board-utils.js';
 import { makeSwingsetTestKit } from '../supports.js';
+import { scale6 } from '../liquidation.js';
 import {
   makeGovernanceDriver,
   makePriceFeedDriver,
@@ -156,7 +158,7 @@ const runAuction = async (runUtils, advanceTimeBy) => {
   return liveAuctionSchedule;
 };
 
-const startAuction = async t => {
+export const startAuction = async t => {
   const { readLatest, advanceTimeTo } = t.context;
 
   const scheduleNotification = readLatest('published.auction.schedule');
