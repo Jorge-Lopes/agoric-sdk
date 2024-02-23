@@ -129,7 +129,6 @@ const trace = makeTracer('VM');
  * @typedef {{
  *   assetTopicKit: import('@agoric/zoe/src/contractSupport/recorder.js').RecorderKit<AssetState>,
  *   debtBrand: Brand<'nat'>,
- *   liquidationsStorageNode: StorageNode
  *   liquidatingVaults: SetStore<Vault>,
  *   metricsTopicKit: import('@agoric/zoe/src/contractSupport/recorder.js').RecorderKit<MetricsNotification>,
  *   poolIncrementSeat: ZCFSeat,
@@ -226,7 +225,6 @@ export const prepareVaultManagerKit = (
       debtMint,
       collateralBrand,
       metricsStorageNode,
-      liquidationsStorageNode,
       startTimeStamp,
       storageNode,
     } = params;
@@ -236,7 +234,6 @@ export const prepareVaultManagerKit = (
     const immutable = {
       debtBrand,
       poolIncrementSeat: zcf.makeEmptySeatKit().zcfSeat,
-      liquidationsStorageNode,
       /**
        * Vaults that have been sent for liquidation. When we get proceeds (or lack
        * thereof) back from the liquidator, we will allocate them among the vaults.
@@ -279,6 +276,7 @@ export const prepareVaultManagerKit = (
       totalShortfallReceived: zeroDebt,
       vaultCounter: 0,
       lockedQuote: undefined,
+      liquidationsStorageNode: undefined,
     });
   };
 
@@ -445,6 +443,19 @@ export const prepareVaultManagerKit = (
             },
           });
           trace('helper.start() done');
+        },
+        provideLiquidationStorageNode() {
+          const { state } = this;
+
+          console.log('LOG: provideLiquidationStorageNode');
+
+          const liquidationNodeP = E(state.storageNode).makeChildNode(
+            'liquidations',
+          );
+
+          E.when(liquidationNodeP, liquidationNode => {
+            state.liquidationsStorageNode = liquidationNode;
+          });
         },
         /**
          * @param {Timestamp} updateTime
@@ -741,6 +752,8 @@ export const prepareVaultManagerKit = (
           const {
             state: { liquidationsStorageNode },
           } = this;
+
+          const { state } = this;
 
           const timestampStorageNode = E(liquidationsStorageNode).makeChildNode(
             `${timestamp.absValue}`,
@@ -1379,6 +1392,7 @@ export const prepareVaultManagerKit = (
 
     {
       finish: ({ state, facets: { helper } }) => {
+        console.log('LOG: FINISHED');
         helper.start();
         void state.assetTopicKit.recorder.write(
           harden({
@@ -1403,15 +1417,13 @@ export const prepareVaultManagerKit = (
    * >} externalParams
    */
   const makeVaultManagerKit = async externalParams => {
-    const [metricsStorageNode, liquidationsStorageNode] = await Promise.all([
-      E(externalParams.storageNode).makeChildNode('metrics'),
-      E(externalParams.storageNode).makeChildNode('liquidations'),
-    ]);
+    const metricsStorageNode = await E(
+      externalParams.storageNode,
+    ).makeChildNode('metrics');
 
     return makeVaultManagerKitInternal({
       ...externalParams,
       metricsStorageNode,
-      liquidationsStorageNode,
     });
   };
   return makeVaultManagerKit;
@@ -1442,6 +1454,7 @@ export const provideAndStartVaultManagerKits = baggage => {
 
   for (const kit of provide(baggage, key, () => noKits)) {
     kit.helper.start();
+    kit.helper.provideLiquidationStorageNode();
   }
 
   trace('provideAndStartVaultManagerKits returning');
