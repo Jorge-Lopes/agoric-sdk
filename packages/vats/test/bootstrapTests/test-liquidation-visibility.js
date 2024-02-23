@@ -143,39 +143,6 @@ const runAuction = async (runUtils, advanceTimeBy) => {
   return liveAuctionSchedule;
 };
 
-const setupVaults = async (t, collateralBrandKey, managerIndex, base = 0) => {
-  const { setupStartingState, walletFactoryDriver, check } = t.context;
-
-  await setupStartingState();
-
-  const minter = await walletFactoryDriver.provideSmartWallet('agoric1minter');
-
-  for (let i = 0; i < setup.vaults.length; i += 1) {
-    const offerId = `open-${collateralBrandKey}-vault${base + i}`;
-    await minter.executeOfferMaker(Offers.vaults.OpenVault, {
-      offerId,
-      collateralBrandKey,
-      wantMinted: setup.vaults[i].ist,
-      giveCollateral: setup.vaults[i].atom,
-    });
-    t.like(minter.getLatestUpdateRecord(), {
-      updated: 'offerStatus',
-      status: { id: offerId, numWantsSatisfied: 1 },
-    });
-  }
-
-  // Verify starting balances
-  for (let i = 0; i < setup.vaults.length; i += 1) {
-    check.vaultNotification(managerIndex, i, {
-      debtSnapshot: {
-        debt: { value: scale6(setup.vaults[i].debt) },
-      },
-      locked: { value: scale6(setup.vaults[i].atom) },
-      vaultState: 'active',
-    });
-  }
-};
-
 const startAuction = async t => {
   const { readLatest, advanceTimeTo } = t.context;
 
@@ -184,8 +151,9 @@ const startAuction = async t => {
   await advanceTimeTo(NonNullish(scheduleNotification.nextStartTime));
 };
 
-const addNewVaults = async ({ t, collateralBrandKey, base }) => {
-  const { walletFactoryDriver, priceFeedDriver } = t.context;
+const addNewVaults = async ({ t, collateralBrandKey, base = 0 }) => {
+  const { walletFactoryDriver, priceFeedDriver, advanceTimeBy } = t.context;
+  await advanceTimeBy(1, 'seconds');
 
   await priceFeedDriver.setPrice(setup.price.starting);
   const minter = await walletFactoryDriver.provideSmartWallet('agoric1minter');
@@ -209,37 +177,15 @@ const addNewVaults = async ({ t, collateralBrandKey, base }) => {
   await startAuction(t);
 };
 
-const initVaults = async ({ t, collateralBrandKey, managerIndex }) => {
-  const { priceFeedDriver, readLatest } = t.context;
-
-  const metricsPath = `published.vaultFactory.managers.manager${managerIndex}.metrics`;
-
-  await setupVaults(t, collateralBrandKey, managerIndex);
-  await placeBids(t, collateralBrandKey, 'agoric1buyer');
-
-  await priceFeedDriver.setPrice(setup.price.trigger);
-  await startAuction(t);
-
-  t.like(readLatest(metricsPath), {
-    numActiveVaults: 0,
-    numLiquidatingVaults: setup.vaults.length,
-    liquidatingCollateral: {
-      value: scale6(setup.auction.start.collateral),
-    },
-    liquidatingDebt: { value: scale6(setup.auction.start.debt) },
-    lockedQuote: null,
-  });
-};
-
 const checkVisibility = async ({
   t,
   managerIndex,
-  setupCallback,
+  collateralBrandKey,
   base = 0,
 }) => {
   const { readLatest, advanceTimeBy, runUtils } = t.context;
 
-  await setupCallback();
+  await addNewVaults({ t, collateralBrandKey, base });
 
   const { startTime, startDelay, endTime } = await runAuction(
     runUtils,
@@ -307,7 +253,10 @@ const checkVisibility = async ({
 };
 
 test.before(async t => {
-  t.context = await makeLiquidationTestContext(t);
+  t.context = await makeLiquidationTestContext(
+    t,
+    '@agoric/vats/decentral-liq-visibility-vaults-config.json',
+  );
 });
 
 test.after.always(t => {
@@ -317,19 +266,15 @@ test.after.always(t => {
 test.serial('visibility-before-upgrade', async t => {
   await checkVisibility({
     t,
+    collateralBrandKey: 'ATOM',
     managerIndex: 0,
-    setupCallback: () =>
-      initVaults({
-        t,
-        collateralBrandKey: 'ATOM',
-        managerIndex: 0,
-      }),
   });
 });
 
 test.serial('restart-vault-factory', async t => {
   const {
     runUtils: { EV },
+    readLatest,
   } = t.context;
   const vaultFactoryKit = await EV.vat('bootstrap').consumeItem(
     'vaultFactoryKit',
@@ -402,12 +347,7 @@ test.serial('visibility-after-upgrade', async t => {
   await checkVisibility({
     t,
     managerIndex: 0,
-    setupCallback: () =>
-      addNewVaults({
-        t,
-        collateralBrandKey: 'ATOM',
-        base: setup.vaults.length,
-      }),
+    collateralBrandKey: 'ATOM',
     base: 3,
   });
 
