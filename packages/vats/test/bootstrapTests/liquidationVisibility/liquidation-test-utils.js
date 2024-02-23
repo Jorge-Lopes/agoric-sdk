@@ -1,15 +1,14 @@
 /* eslint-disable no-lone-blocks, no-await-in-loop */
 // @ts-check
+/* global process */
 /**
  * @file Bootstrap test vaults liquidation visibility
  */
 import * as processAmbient from 'child_process';
 import * as fsAmbient from 'fs';
-import { Fail } from '@agoric/assert';
-import { NonNullish } from '@agoric/assert/src/assert.js';
+import { Fail, NonNullish } from '@agoric/assert';
 import { Offers } from '@agoric/inter-protocol/src/clientSupport.js';
 import { TimeMath } from '@agoric/time';
-import { scale6 } from '../liquidation.js';
 import { eventLoopIteration } from '@agoric/internal/src/testing-utils.js';
 import {
   SECONDS_PER_HOUR,
@@ -17,6 +16,7 @@ import {
 } from '@agoric/inter-protocol/src/proposals/econ-behaviors.js';
 import { makeAgoricNamesRemotesFromFakeStorage } from '../../../tools/board-utils.js';
 import { makeSwingsetTestKit } from '../supports.js';
+import { scale6 } from '../liquidation.js';
 import {
   makeGovernanceDriver,
   makePriceFeedDriver,
@@ -157,7 +157,7 @@ const runAuction = async (runUtils, advanceTimeBy) => {
   return liveAuctionSchedule;
 };
 
-const startAuction = async t => {
+export const startAuction = async t => {
   const { readLatest, advanceTimeTo } = t.context;
 
   const scheduleNotification = readLatest('published.auction.schedule');

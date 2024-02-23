@@ -153,6 +153,7 @@ const trace = makeTracer('VM');
  *   totalShortfallReceived: Amount<'nat'>,
  *   vaultCounter: number,
  *   lockedQuote: PriceQuote | undefined,
+ *  liquidationsStorageNode: StorageNode | undefined,
  * }} MutableState
  */
 
@@ -214,10 +215,7 @@ export const prepareVaultManagerKit = (
   const makeVault = prepareVault(baggage, makeRecorderKit, zcf);
 
   /**
-   * @param {HeldParams & {
-   *   metricsStorageNode: StorageNode;
-   *   liquidationsStorageNode: StorageNode;
-   * }} params
+   * @param {HeldParams & { metricsStorageNode: StorageNode }} params
    * @returns {HeldParams & ImmutableState & MutableState}
    */
   const initState = params => {
@@ -234,6 +232,7 @@ export const prepareVaultManagerKit = (
     const immutable = {
       debtBrand,
       poolIncrementSeat: zcf.makeEmptySeatKit().zcfSeat,
+
       /**
        * Vaults that have been sent for liquidation. When we get proceeds (or lack
        * thereof) back from the liquidator, we will allocate them among the vaults.
@@ -388,6 +387,7 @@ export const prepareVaultManagerKit = (
             unsettledVaults,
           } = state;
 
+          facets.helper.provideLiquidationStorageNode();
           const ephemera = collateralEphemera(collateralBrand);
           ephemera.prioritizedVaults = makePrioritizedVaults(unsettledVaults);
 
@@ -753,7 +753,10 @@ export const prepareVaultManagerKit = (
             state: { liquidationsStorageNode },
           } = this;
 
-          const { state } = this;
+          assert(
+            liquidationsStorageNode,
+            'liquidationsStorageNode not defined',
+          );
 
           const timestampStorageNode = E(liquidationsStorageNode).makeChildNode(
             `${timestamp.absValue}`,
@@ -1392,7 +1395,6 @@ export const prepareVaultManagerKit = (
 
     {
       finish: ({ state, facets: { helper } }) => {
-        console.log('LOG: FINISHED');
         helper.start();
         void state.assetTopicKit.recorder.write(
           harden({
@@ -1410,17 +1412,11 @@ export const prepareVaultManagerKit = (
     },
   );
 
-  /**
-   * @param {Omit<
-   *   Parameters<typeof makeVaultManagerKitInternal>[0],
-   *   'metricsStorageNode' | 'liquidationsStorageNode'
-   * >} externalParams
-   */
+  /** @param {Omit<Parameters<typeof makeVaultManagerKitInternal>[0], 'metricsStorageNode'>} externalParams */
   const makeVaultManagerKit = async externalParams => {
     const metricsStorageNode = await E(
       externalParams.storageNode,
     ).makeChildNode('metrics');
-
     return makeVaultManagerKitInternal({
       ...externalParams,
       metricsStorageNode,
@@ -1454,7 +1450,6 @@ export const provideAndStartVaultManagerKits = baggage => {
 
   for (const kit of provide(baggage, key, () => noKits)) {
     kit.helper.start();
-    kit.helper.provideLiquidationStorageNode();
   }
 
   trace('provideAndStartVaultManagerKits returning');
