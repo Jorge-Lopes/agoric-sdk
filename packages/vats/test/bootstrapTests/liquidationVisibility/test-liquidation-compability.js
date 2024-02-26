@@ -6,7 +6,6 @@ import { test as anyTest } from '@agoric/zoe/tools/prepare-test-env-ava.js';
 import {
   checkVMChildNodes,
   makeTestContext,
-  startAuction,
 } from './liquidation-test-utils.js';
 
 /**
@@ -107,4 +106,3 @@ test.serial('visibility-after-upgrade', async t => {
   t.log('Data', storage.data.keys());
   t.pass();
 });
-
