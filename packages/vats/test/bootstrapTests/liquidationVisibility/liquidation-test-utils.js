@@ -14,6 +14,7 @@ import {
   SECONDS_PER_HOUR,
   SECONDS_PER_MINUTE,
 } from '@agoric/inter-protocol/src/proposals/econ-behaviors.js';
+import { scale6 } from '../liquidation.js';
 import { makeAgoricNamesRemotesFromFakeStorage } from '../../../tools/board-utils.js';
 import { makeSwingsetTestKit } from '../supports.js';
 import { scale6 } from '../liquidation.js';
@@ -346,6 +347,7 @@ const makeProposalExtractor = ({ childProcess, fs }) => {
     packageScriptName,
     env = {},
   }) => {
+    // eslint-disable-next-line no-undef
     const scriptEnv = Object.assign(Object.create(process.env), env);
     // XXX use '@agoric/inter-protocol'?
     const out = await runPackageScript(

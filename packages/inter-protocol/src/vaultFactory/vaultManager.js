@@ -215,7 +215,9 @@ export const prepareVaultManagerKit = (
   const makeVault = prepareVault(baggage, makeRecorderKit, zcf);
 
   /**
-   * @param {HeldParams & { metricsStorageNode: StorageNode }} params
+   * @param {HeldParams & {
+   *   metricsStorageNode: StorageNode;
+   * }} params
    * @returns {HeldParams & ImmutableState & MutableState}
    */
   const initState = params => {
@@ -275,7 +277,6 @@ export const prepareVaultManagerKit = (
       totalShortfallReceived: zeroDebt,
       vaultCounter: 0,
       lockedQuote: undefined,
-      liquidationsStorageNode: undefined,
     });
   };
 
@@ -390,6 +391,10 @@ export const prepareVaultManagerKit = (
           facets.helper.provideLiquidationStorageNode();
           const ephemera = collateralEphemera(collateralBrand);
           ephemera.prioritizedVaults = makePrioritizedVaults(unsettledVaults);
+          // We have to store this in ephemera since we can't add new properties
+          // to the `state`. See https://github.com/Agoric/agoric-sdk/blob/master/packages/SwingSet/docs/virtual-objects.md
+          ephemera.liquidationsStorageNode =
+            E(storageNode).makeChildNode('liquidations');
 
           trace('helper.start() making periodNotifier');
           const periodNotifier = E(timerService).makeNotifier(
@@ -443,19 +448,6 @@ export const prepareVaultManagerKit = (
             },
           });
           trace('helper.start() done');
-        },
-        provideLiquidationStorageNode() {
-          const { state } = this;
-
-          console.log('LOG: provideLiquidationStorageNode');
-
-          const liquidationNodeP = E(state.storageNode).makeChildNode(
-            'liquidations',
-          );
-
-          E.when(liquidationNodeP, liquidationNode => {
-            state.liquidationsStorageNode = liquidationNode;
-          });
         },
         /**
          * @param {Timestamp} updateTime
@@ -750,17 +742,14 @@ export const prepareVaultManagerKit = (
          */
         async makeLiquidationRecorderKits(timestamp) {
           const {
-            state: { liquidationsStorageNode },
+            state: { collateralBrand },
           } = this;
 
-          assert(
-            liquidationsStorageNode,
-            'liquidationsStorageNode not defined',
-          );
+          const ephemera = collateralEphemera(collateralBrand);
 
-          const timestampStorageNode = E(liquidationsStorageNode).makeChildNode(
-            `${timestamp.absValue}`,
-          );
+          const timestampStorageNode = E(
+            ephemera.liquidationsStorageNode,
+          ).makeChildNode(`${timestamp.absValue}`);
 
           const [
             preAuctionStorageNode,
