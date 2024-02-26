@@ -17,7 +17,6 @@ import {
 import { scale6 } from '../liquidation.js';
 import { makeAgoricNamesRemotesFromFakeStorage } from '../../../tools/board-utils.js';
 import { makeSwingsetTestKit } from '../supports.js';
-import { scale6 } from '../liquidation.js';
 import {
   makeGovernanceDriver,
   makePriceFeedDriver,

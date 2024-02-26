@@ -153,7 +153,6 @@ const trace = makeTracer('VM');
  *   totalShortfallReceived: Amount<'nat'>,
  *   vaultCounter: number,
  *   lockedQuote: PriceQuote | undefined,
- *  liquidationsStorageNode: StorageNode | undefined,
  * }} MutableState
  */
 
@@ -388,7 +387,6 @@ export const prepareVaultManagerKit = (
             unsettledVaults,
           } = state;
 
-          facets.helper.provideLiquidationStorageNode();
           const ephemera = collateralEphemera(collateralBrand);
           ephemera.prioritizedVaults = makePrioritizedVaults(unsettledVaults);
           // We have to store this in ephemera since we can't add new properties
