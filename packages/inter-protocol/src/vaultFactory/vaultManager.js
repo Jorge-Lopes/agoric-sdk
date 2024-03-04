@@ -24,7 +24,7 @@ import {
   NotifierShape,
   RatioShape,
 } from '@agoric/ertp';
-import { allValuesSettled, makeTracer } from '@agoric/internal';
+import { zip, makeTracer } from '@agoric/internal';
 import { makeStoredNotifier, observeNotifier } from '@agoric/notifier';
 import { appendToStoredArray } from '@agoric/store/src/stores/store-utils.js';
 import {
@@ -1461,3 +1461,21 @@ export const provideAndStartVaultManagerKits = baggage => {
   };
 };
 harden(provideAndStartVaultManagerKits);
+
+/**
+ * Just like allValues above but use this when you want to silently handle rejected promises
+ * and still keep using the values of resolved ones.
+ *
+ * TODO: Move this to @agoric/internal
+ *
+ * @type
+ * { <T extends Record<string, ERef<any>>>(obj: T) => Promise<{ [K in keyof T]: Awaited<T[K]>}> }
+ */
+export const allValuesSettled = async obj => {
+  const { values, fromEntries, keys } = Object;
+  const resolved = await Promise.allSettled(values(obj));
+  // @ts-expect-error
+  const valuesMapped = resolved.map(({ value }) => value);
+  // @ts-expect-error cast
+  return harden(fromEntries(zip(keys(obj), valuesMapped)));
+};
