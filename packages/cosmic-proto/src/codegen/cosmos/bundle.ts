@@ -47,21 +47,26 @@ import * as _61 from './group/v1/types.js';
 import * as _62 from './mint/v1beta1/genesis.js';
 import * as _63 from './mint/v1beta1/mint.js';
 import * as _64 from './mint/v1beta1/query.js';
-import * as _65 from './params/v1beta1/params.js';
-import * as _66 from './params/v1beta1/query.js';
-import * as _67 from './staking/v1beta1/authz.js';
-import * as _68 from './staking/v1beta1/genesis.js';
-import * as _69 from './staking/v1beta1/query.js';
-import * as _70 from './staking/v1beta1/staking.js';
-import * as _71 from './staking/v1beta1/tx.js';
-import * as _72 from './tx/signing/v1beta1/signing.js';
-import * as _73 from './tx/v1beta1/service.js';
-import * as _74 from './tx/v1beta1/tx.js';
-import * as _75 from './upgrade/v1beta1/query.js';
-import * as _76 from './upgrade/v1beta1/tx.js';
-import * as _77 from './upgrade/v1beta1/upgrade.js';
-import * as _78 from './vesting/v1beta1/tx.js';
-import * as _79 from './vesting/v1beta1/vesting.js';
+import * as _65 from './nft/v1beta1/event.js';
+import * as _66 from './nft/v1beta1/genesis.js';
+import * as _67 from './nft/v1beta1/nft.js';
+import * as _68 from './nft/v1beta1/query.js';
+import * as _69 from './nft/v1beta1/tx.js';
+import * as _70 from './params/v1beta1/params.js';
+import * as _71 from './params/v1beta1/query.js';
+import * as _72 from './staking/v1beta1/authz.js';
+import * as _73 from './staking/v1beta1/genesis.js';
+import * as _74 from './staking/v1beta1/query.js';
+import * as _75 from './staking/v1beta1/staking.js';
+import * as _76 from './staking/v1beta1/tx.js';
+import * as _77 from './tx/signing/v1beta1/signing.js';
+import * as _78 from './tx/v1beta1/service.js';
+import * as _79 from './tx/v1beta1/tx.js';
+import * as _80 from './upgrade/v1beta1/query.js';
+import * as _81 from './upgrade/v1beta1/tx.js';
+import * as _82 from './upgrade/v1beta1/upgrade.js';
+import * as _83 from './vesting/v1beta1/tx.js';
+import * as _84 from './vesting/v1beta1/vesting.js';
 export namespace cosmos {
   export namespace auth {
     export const v1beta1 = {
@@ -183,43 +188,52 @@ export namespace cosmos {
       ..._64,
     };
   }
-  export namespace params {
+  export namespace nft {
     export const v1beta1 = {
       ..._65,
       ..._66,
+      ..._67,
+      ..._68,
+      ..._69,
+    };
+  }
+  export namespace params {
+    export const v1beta1 = {
+      ..._70,
+      ..._71,
     };
   }
   export namespace staking {
     export const v1beta1 = {
-      ..._67,
-      ..._68,
-      ..._69,
-      ..._70,
-      ..._71,
+      ..._72,
+      ..._73,
+      ..._74,
+      ..._75,
+      ..._76,
     };
   }
   export namespace tx {
     export namespace signing {
       export const v1beta1 = {
-        ..._72,
+        ..._77,
       };
     }
     export const v1beta1 = {
-      ..._73,
-      ..._74,
+      ..._78,
+      ..._79,
     };
   }
   export namespace upgrade {
     export const v1beta1 = {
-      ..._75,
-      ..._76,
-      ..._77,
+      ..._80,
+      ..._81,
+      ..._82,
     };
   }
   export namespace vesting {
     export const v1beta1 = {
-      ..._78,
-      ..._79,
+      ..._83,
+      ..._84,
     };
   }
 }
