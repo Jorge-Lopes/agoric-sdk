@@ -7,12 +7,15 @@
 import type {
   Amount,
   Brand,
+  CopyBagAmount,
+  CopySetAmount,
   NatAmount,
   Payment,
 } from '@agoric/ertp/src/types.js';
 import type { LocalChainAccount } from '@agoric/vats/src/localchain.js';
 import type { Timestamp } from '@agoric/time';
 import type { IBCMsgTransferOptions, KnownChains } from './types.js';
+import { Any } from '@agoric/cosmic-proto/google/protobuf/any.js';
 
 /**
  * A denom that designates a path to a token type on some blockchain.
@@ -47,6 +50,24 @@ export type DenomAmount = {
 
 /** Amounts can be provided as pure data using denoms or as ERTP Amounts */
 export type AmountArg = DenomAmount | Amount;
+
+/** 
+ * A denom that designates a path to a non-fungible token Class on some remote blockchain. 
+ * A distinct type definition was made to avoid conflicts with the 'Denom'.
+ * */
+export type NftDenom = string;
+
+export type NftDenomArg = NftDenom | Brand;
+
+export type NftDenomAmount = {
+  brand: NftDenom;
+  value: {
+    id: string;
+    uri: string;
+    uri_hash:string;
+    data: Any;
+  };
+};
 
 /** An address on some blockchain, e.g., cosmos, eth, etc. */
 export type ChainAddress = {
@@ -117,6 +138,15 @@ export interface Orchestrator {
    * @returns the Amount in local structuerd format
    */
   asAmount: (amount: DenomAmount) => NatAmount;
+
+  /**
+   * Convert an NFT amount described in native data to a local, structured Amount.
+   * @param amount - the described amount
+   * @returns the Amount in local structured format as either CopySet or CopyBag
+   */
+  asNftAmount: (
+    amount: NftDenomAmount,
+  ) => CopySetAmount<NftDenomAmount['brand']> | CopyBagAmount<NftDenomAmount['brand']>;
 }
 
 /**
@@ -133,6 +163,11 @@ export interface OrchestrationAccountI {
 
   /** @returns the balance of a specific denom for the account. */
   getBalance: (denom: DenomArg) => Promise<DenomAmount>;
+
+  /** @returns an array of amounts for every NFT in the account. */
+  getNftBalances: () => Promise<NftDenomAmount[]>;
+
+  getNftBalance: (brand: NftDenomArg) => Promise<NftDenomAmount>;
 
   /**
    * Transfer amount to another account on the same chain. The promise settles when the transfer is complete.

@@ -179,6 +179,7 @@ export const makeOrchestrationFacade = ({
         },
         getBrandInfo: anyVal,
         asAmount: anyVal,
+        asNftAmount: anyVal,
       };
       return async (...args) => fn(orc, ctx, ...args);
     },
