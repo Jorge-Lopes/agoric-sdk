@@ -37,3 +37,7 @@ export const IBCTransferOptionsShape = M.splitRecord(
     memo: M.string(),
   },
 );
+
+export const NftShape = { nftDenom: M.string(), value: M.record() };
+
+export const NftAmountShape = harden({ nftDenom: M.string(), value: M.bag() });
