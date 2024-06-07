@@ -146,7 +146,7 @@ export interface Orchestrator {
    */
   asNftAmount: (
     amount: NftDenomAmount,
-  ) => CopySetAmount<NftDenomAmount['brand']> | CopyBagAmount<NftDenomAmount['brand']>;
+  ) => CopyBagAmount<NftDenomAmount['denom']>;
 }
 
 /**
