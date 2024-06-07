@@ -10,22 +10,30 @@ import {
   QueryNFTsRequest,
   QueryNFTsResponse,
 } from '@agoric/cosmic-proto/cosmos/nft/v1beta1/query.js';
-import {
-  MsgSend,
-  MsgSendResponse,
-} from '@agoric/cosmic-proto/cosmos/nft/v1beta1/tx.js';
+import { MsgSend } from '@agoric/cosmic-proto/cosmos/nft/v1beta1/tx.js';
+
+
+/**
+ * ToDo: the denom provided will not consist of only the classId
+ * @returns {import('../types.js').NftDenomAmount}
+ */
+const toNftDenomAmount = nft => ({
+  denom: nft.classId,
+  value: {
+    id: nft.id,
+    uri: nft.uri,
+    uri_hash: nft.uriHash,
+    data: Any.fromPartial(nft.data),
+  },
+});
 
 /**
  * @param {import('@agoric/zone').Zone} zone
- * @param {ZCF} zcf
  */
-export const prepareNftKit = (zone, zcf) => {
+export const prepareNftKit = zone => {
   const makeNftKit = zone.exoClassKit(
     'Nft Account Holder',
     {
-      helper: M.interface('helper', {
-        toNftDenomAmount: M.call(M.string()).returns(M.any()),
-      }),
       holder: M.interface('IcaAccountHolder', {
         getPublicTopics: M.call().returns(TopicsRecordShape),
         getAddress: M.call().returns(ChainAddressShape),
@@ -38,30 +46,29 @@ export const prepareNftKit = (zone, zcf) => {
      * @param {import('../types.js').ChainAddress} chainAddress
      * @param {import('../types.js').IcaAccount} account
      * @param {import('../types.js').ICQConnection} icqConnection
-     * @param {string} nftDenom
-     * @param {StorageNode} storageNode
      */
-    (chainAddress, account, icqConnection, nftDenom, storageNode) => {
-      return { chainAddress, account, icqConnection, nftDenom };
+    (chainAddress, account, icqConnection) => {
+      return { chainAddress, account, icqConnection };
     },
     {
-      helper: {
-        toNftDenomAmount(nft) {},
-      },
       holder: {
         getAddress() {
           return this.state.chainAddress.address;
         },
+        /**
+         * @param {import('../types.js').NftDenom} denom
+         */
         async getBalance(denom) {
-          const { toNftDenomAmount } = this.facets.helper;
-          const { chainAddress, icqConnection, nftDenom } = this.state;
-          denom ||= nftDenom;
+          const { chainAddress, icqConnection } = this.state;
           assert.typeof(denom, 'string');
+
+          // ToDo: the denom may have to be deconstructed to extract the classId from the host chain identifier
+          const classId = denom;
 
           const [result] = await E(icqConnection).query([
             toRequestQueryJson(
               QueryNFTsRequest.toProtoMsg({
-                classId: denom,
+                classId: classId,
                 owner: chainAddress.address,
               }),
             ),
@@ -71,14 +78,14 @@ export const prepareNftKit = (zone, zcf) => {
           const { nfts } = QueryNFTsResponse.decode(decodeBase64(result.key));
           if (!nfts) throw Fail`Result lacked balance key: ${result}`;
 
-          return harden(toNftDenomAmount(nfts));
+          return harden(nfts.map(toNftDenomAmount));
         },
         async getBalances() {
-          const { toNftDenomAmount } = this.facets.helper;
           const { chainAddress, icqConnection } = this.state;
 
           /* Based on the protobuf definition for QueryNFTsRequest,
            * it should be possible to provide only the owner as argument
+           * ToDo: verify if this is indeed the case.
            */
           const [result] = await E(icqConnection).query([
             toRequestQueryJson(
@@ -93,11 +100,17 @@ export const prepareNftKit = (zone, zcf) => {
           const { nfts } = QueryNFTsResponse.decode(decodeBase64(result.key));
           if (!nfts) throw Fail`Result lacked balance key: ${result}`;
 
-          return harden(toNftDenomAmount(nfts));
+          return harden(nfts.map(toNftDenomAmount));
         },
+        /**
+         * @param {import('../types.js').NftDenomAmount} nftAmount
+         * @param {string} address
+         */
         async send(nftAmount, address) {
           const { account } = this.state;
-          const classId = this.state.nftDenom || nftAmount.brand;
+
+          // ToDo: the denom may have to be deconstructed to extract the classId from the host chain identifier
+          const classId = nftAmount.denom;
 
           await E(account).executeEncodedTx([
             Any.toJSON(

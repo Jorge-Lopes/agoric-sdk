@@ -60,7 +60,7 @@ export type NftDenom = string;
 export type NftDenomArg = NftDenom | Brand;
 
 export type NftDenomAmount = {
-  brand: NftDenom;
+  denom: NftDenom;
   value: {
     id: string;
     uri: string;
