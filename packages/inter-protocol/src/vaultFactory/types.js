@@ -16,6 +16,9 @@
  * @typedef {import('@agoric/time/src/types.js').TimestampRecord} TimestampRecord
  *
  * @typedef {import('@agoric/time').RelativeTime} RelativeTime
+ *
+ * @typedef {import('./liquidation.js').VaultData} VaultData
+ * @typedef {import('./proceeds.js').DistributionPlan} DistributionPlan
  */
 
 /**
@@ -138,12 +141,12 @@
 
 /**
  * @typedef {{
- *   plan: import('./proceeds.js').DistributionPlan;
- *   vaultsInPlan: Array;
+ *   plan: DistributionPlan | undefined;
+ *   vaultsInPlan: Array | undefined;
  * }} PostAuctionParams
  *
  * @typedef {{
- *   plan: import('./proceeds.js').DistributionPlan;
+ *   plan: DistributionPlan | undefined;
  *   totalCollateral: Amount<'nat'>;
  *   totalDebt: Amount<'nat'>;
  *   auctionSchedule: import('../auction/scheduler.js').FullSchedule;
@@ -151,7 +154,6 @@
  */
 
 /**
- * @typedef {import('./liquidation.js').VaultData} VaultData
  *
  * @typedef {object} LiquidationVisibilityWriters
  * @property {(vaultData: VaultData) => Promise<void>} writePreAuction
