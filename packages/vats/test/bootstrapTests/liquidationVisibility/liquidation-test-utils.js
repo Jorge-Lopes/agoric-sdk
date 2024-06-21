@@ -65,6 +65,7 @@ const outcome = /** @type {const} */ ({
       STARS: 0.309852,
     },
     shortfall: 0,
+    minted: 0,
   },
   // The order in the setup preserved
   vaults: [
@@ -78,6 +79,10 @@ const outcome = /** @type {const} */ ({
       locked: 3.425146,
     },
   ],
+  remaining: {
+    collateral: 0,
+  },
+  penalty: 0.30985,
 });
 //#endregion
 
@@ -89,9 +94,8 @@ const placeBids = async (
 ) => {
   const { agoricNamesRemotes, walletFactoryDriver, readLatest } = t.context;
 
-  const buyer = await walletFactoryDriver.provideSmartWallet(
-    buyerWalletAddress,
-  );
+  const buyer =
+    await walletFactoryDriver.provideSmartWallet(buyerWalletAddress);
 
   await buyer.sendOffer(
     Offers.psm.swap(
@@ -230,16 +234,18 @@ export const checkVisibility = async ({
     collateralOffered: { value: scale6(setup.auction.start.collateral) },
     istTarget: { value: scale6(setup.auction.start.debt) },
     collateralForReserve: { value: scale6(outcome.reserve.allocations.ATOM) },
-    shortfallToReserve: { value: 0n },
+    shortfallToReserve: { value: scale6(outcome.reserve.shortfall) },
     mintedProceeds: { value: scale6(setup.auction.start.debt) },
     collateralSold: {
       value:
         scale6(setup.auction.start.collateral) -
         scale6(setup.auction.end.collateral),
     },
-    collateralRemaining: { value: 0n },
+    collateralRemaining: { value: scale6(outcome.remaining.collateral) },
     endTime: { absValue: endTime.absValue },
     startTime: { absValue: startTime.absValue },
+    mintedForReserve: { value: scale6(outcome.reserve.minted) },
+    totalPenalty: { value: scale6(outcome.penalty) },
   });
 
   t.log('preAuction', preAuction);
