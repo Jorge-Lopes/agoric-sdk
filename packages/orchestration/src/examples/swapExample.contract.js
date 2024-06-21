@@ -4,6 +4,7 @@ import { withdrawFromSeat } from '@agoric/zoe/src/contractSupport/zoeHelpers.js'
 import { Far } from '@endo/far';
 import { deeplyFulfilled } from '@endo/marshal';
 import { M, objectMap } from '@endo/patterns';
+import { when } from '@agoric/vow/vat.js';
 import { orcUtils } from '../utils/orc.js';
 import { provideOrchestration } from '../utils/start-helper.js';
 
@@ -95,15 +96,22 @@ export const start = async (zcf, privateArgs, baggage) => {
       const agoric = await orch.getChain('agoric');
 
       const [omniAccount, localAccount] = await Promise.all([
-        omni.makeAccount(),
-        agoric.makeAccount(),
+        // XXX when() until membrane
+        when(omni.makeAccount()),
+        // XXX when() until membrane
+        when(agoric.makeAccount()),
       ]);
 
       const omniAddress = omniAccount.getAddress();
 
       // deposit funds from user seat to LocalChainAccount
       const payments = await withdrawFromSeat(zcf, seat, give);
-      await deeplyFulfilled(objectMap(payments, localAccount.deposit));
+      await deeplyFulfilled(
+        objectMap(payments, payment =>
+          // @ts-expect-error payment is ERef<Payment> which happens to work but isn't officially supported
+          localAccount.deposit(payment),
+        ),
+      );
       seat.exit();
 
       // build swap instructions with orcUtils library
