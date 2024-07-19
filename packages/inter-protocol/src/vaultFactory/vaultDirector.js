@@ -39,6 +39,7 @@ import {
   prepareVaultManagerKit,
   provideAndStartVaultManagerKits,
 } from './vaultManager.js';
+import { makeHandle } from '@agoric/zoe/src/makeHandle.js';
 
 /**
  * @import {TypedPattern} from '@agoric/internal';
@@ -116,7 +117,7 @@ const prepareVaultDirector = (
 
   const rewardPoolSeat = provideEmptySeat(zcf, baggage, 'rewardPoolSeat');
 
-  /** @type {MapStore<Brand, number>} index of manager for the given collateral */
+  /** @type {MapStore<Brand, MapStore>} index of manager for the given collateral */
   const collateralManagers = provideDurableMapStore(
     baggage,
     'collateralManagers',
@@ -250,11 +251,12 @@ const prepareVaultDirector = (
 
   const vaultManagers = provideAndStartVaultManagerKits(baggage);
 
-  /** @type {(brand: Brand) => VaultManager} */
-  const managerForCollateral = brand => {
-    const managerIndex = collateralManagers.get(brand);
-    const manager = vaultManagers.get(managerIndex).self;
-    manager || Fail`no manager ${managerIndex} for collateral ${brand}`;
+  /** @type {(brand: Brand, vmHandle: Handle<string>) => VaultManager} */
+  const managerForCollateral = (brand, vmHandle) => {
+    const brandVMStore = collateralManagers.get(brand);
+    const manager = brandVMStore.get(vmHandle);
+
+    manager || Fail`no manager ${vmHandle} for collateral ${brand}`;
     return manager;
   };
 
@@ -366,59 +368,102 @@ const prepareVaultDirector = (
          * @param {Issuer<'nat'>} collateralIssuer
          * @param {Keyword} collateralKeyword
          * @param {VaultManagerParamValues} initialParamValues
+         * @param {string[]} whitelist
          */
         async addVaultType(
           collateralIssuer,
           collateralKeyword,
           initialParamValues,
+          whitelist,
         ) {
-          trace('addVaultType', collateralKeyword, initialParamValues);
-          mustMatch(collateralIssuer, M.remotable(), 'collateralIssuer');
-          assertKeywordName(collateralKeyword);
-          mustMatch(
+          const { helper } = this.facets;
+          trace(
+            'addVaultType',
+            collateralKeyword,
             initialParamValues,
-            vaultParamPattern,
-            'initialParamValues',
+            whitelist,
           );
+
+          assertKeywordName(collateralKeyword);
+          mustMatch(collateralIssuer, M.remotable(), 'collateralIssuer');
           await zcf.saveIssuer(collateralIssuer, collateralKeyword);
           const collateralBrand = zcf.getBrandForIssuer(collateralIssuer);
-          // We create only one vault per collateralType.
+
+          // Verify that a vault type has NOT been added for this collateral.
           !collateralManagers.has(collateralBrand) ||
-            Fail`Collateral brand ${q(collateralBrand)} has already been added`;
+            Fail`Collateral brand ${q(collateralBrand)} has not been added`;
 
-          // zero-based index of the manager being made
-          const managerIndex = vaultManagers.length();
-          const managerId = `manager${managerIndex}`;
-          const managerStorageNode =
-            await E(managersNode).makeChildNode(managerId);
+          const vmHandle = makeHandle(`${collateralBrand}VaultManager`);
 
-          vaultParamManagers.addParamManager(
+          const metadata = {
+            identifier: vmHandle,
+            title: `${collateralBrand}VaultManager`,
+            whitelist,
+          };
+
+          const vm = await helper.makeVaultManager(
             collateralBrand,
-            managerStorageNode,
             initialParamValues,
+            metadata,
           );
 
-          const startTimeStamp = await E(timer).getCurrentTimestamp();
+          const brand = collateralBrand.getAllegedName();
+          const brandVMStore = provideDurableMapStore(baggage, `${brand}Store`);
 
-          const collateralUnit = await unitAmount(collateralBrand);
+          collateralManagers.init(collateralBrand, brandVMStore);
+          brandVMStore.init(vmHandle, vm);
 
-          const kit = await makeVaultManagerKit({
-            debtMint,
-            collateralBrand,
-            collateralUnit,
-            descriptionScope: managerId,
-            startTimeStamp,
-            storageNode: managerStorageNode,
-          });
-          vaultManagers.add(kit);
-          vaultManagers.length() - 1 === managerIndex ||
-            Fail`mismatch VaultManagerKit count`;
-          const { self: vm } = kit;
-          vm || Fail`no vault`;
-          collateralManagers.init(collateralBrand, managerIndex);
-          void writeMetrics();
           return vm;
         },
+
+        /**
+         * @param {Issuer<'nat'>} collateralIssuer
+         * @param {Keyword} collateralKeyword
+         * @param {VaultManagerParamValues} initialParamValues
+         * @param {string[]} whitelist
+         */
+        async addNewManager(
+          collateralIssuer,
+          collateralKeyword,
+          initialParamValues,
+          whitelist,
+        ) {
+          const { helper } = this.facets;
+          trace(
+            'addNewManager',
+            collateralKeyword,
+            initialParamValues,
+            whitelist,
+          );
+
+          assertKeywordName(collateralKeyword);
+          mustMatch(collateralIssuer, M.remotable(), 'collateralIssuer');
+          const collateralBrand = zcf.getBrandForIssuer(collateralIssuer);
+
+          // Verify that a vault type has been added for this collateral.
+          collateralManagers.has(collateralBrand) ||
+            Fail`Collateral brand ${q(collateralBrand)} has not been added`;
+
+          const vmHandle = makeHandle(`${collateralBrand}VaultManager`);
+
+          const metadata = {
+            identifier: vmHandle,
+            title: `${collateralBrand}VaultManager`,
+            whitelist,
+          };
+
+          const vm = await helper.makeVaultManager(
+            collateralBrand,
+            initialParamValues,
+            metadata,
+          );
+
+          const brandVMStore = collateralManagers.get(collateralBrand);
+          brandVMStore.init(vmHandle, vm);
+
+          return vm;
+        },
+
         makeCollectFeesInvitation() {
           return makeCollectFeesInvitation(
             zcf,
@@ -457,12 +502,16 @@ const prepareVaultDirector = (
         },
       },
       public: {
-        /** @param {Brand} brandIn */
-        getCollateralManager(brandIn) {
+        
+        /**
+         * @param {Brand} brandIn
+         * @param {Handle<string>} vmHandle
+         */
+        getCollateralManager(brandIn, vmHandle) {
           collateralManagers.has(brandIn) ||
             Fail`Not a supported collateral type ${brandIn}`;
           /** @type {VaultManager} */
-          return managerForCollateral(brandIn).getPublicFacet();
+          return managerForCollateral(brandIn, vmHandle).getPublicFacet();
         },
         getDebtIssuer() {
           return debtMint.getIssuerRecord().issuer;
@@ -498,6 +547,58 @@ const prepareVaultDirector = (
         },
       },
       helper: {
+        /**
+         * @param {Brand<'nat'>} collateralBrand
+         * @param {VaultManagerParamValues} initialParamValues
+         * @param {any} metadata
+         */
+        async makeVaultManager(collateralBrand, initialParamValues, metadata) {
+          mustMatch(
+            initialParamValues,
+            vaultParamPattern,
+            'initialParamValues',
+          );
+
+          // zero-based index of the manager being made
+          const managerIndex = vaultManagers.length();
+          const managerId = `manager${managerIndex}`;
+          const managerStorageNode =
+            await E(managersNode).makeChildNode(managerId);
+
+          vaultParamManagers.addParamManager(
+            collateralBrand,
+            managerStorageNode,
+            initialParamValues,
+          );
+
+          const startTimeStamp = await E(timer).getCurrentTimestamp();
+
+          const collateralUnit = await unitAmount(collateralBrand);
+
+          const vaultManagerHandle = makeHandle(
+            `${collateralBrand}VaultManager`,
+          );
+
+          const kit = await makeVaultManagerKit({
+            debtMint,
+            collateralBrand,
+            collateralUnit,
+            descriptionScope: managerId,
+            startTimeStamp,
+            storageNode: managerStorageNode,
+            metadata,
+          });
+
+          vaultManagers.add(kit);
+          vaultManagers.length() - 1 === managerIndex ||
+            Fail`mismatch VaultManagerKit count`;
+          const { self: vm } = kit;
+          vm || Fail`no vault`;
+
+          void writeMetrics();
+          return vm;
+        },
+
         resetWakeupsForNextAuction() {
           const { facets } = this;
 
